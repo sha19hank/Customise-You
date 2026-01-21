@@ -1,0 +1,69 @@
+# Python Requirements for CustomiseYou AI/ML Systems
+# Install with: pip install -r requirements.txt
+
+# Core Dependencies
+python-dotenv==1.0.0
+python-dateutil==2.8.2
+
+# Data Science & ML
+numpy==1.24.3
+pandas==2.0.2
+scikit-learn==1.2.2
+scipy==1.10.1
+
+# Deep Learning
+tensorflow==2.12.0
+torch==2.0.1
+torchvision==0.15.2
+
+# NLP & Text Processing
+nltk==3.8.1
+spacy==3.5.0
+transformers==4.29.2
+sentence-transformers==2.2.2
+
+# API & Web Framework
+flask==2.3.2
+flask-cors==4.0.0
+fastapi==0.100.0
+uvicorn==0.23.1
+pydantic==2.0.0
+
+# Database
+psycopg2-binary==2.9.6
+redis==4.5.5
+sqlalchemy==2.0.19
+alembic==1.11.1
+
+# Task Queue & Async
+celery==5.3.1
+redis==4.5.5
+
+# Monitoring & Logging
+python-json-logger==2.0.7
+prometheus-client==0.17.1
+
+# Testing
+pytest==7.3.2
+pytest-asyncio==0.21.0
+pytest-cov==4.1.0
+
+# Code Quality
+black==23.7.0
+flake8==6.0.0
+pylint==2.17.5
+mypy==1.4.1
+
+# Utilities
+requests==2.31.0
+click==8.1.6
+tqdm==4.65.0
+python-multipart==0.0.6
+
+# Image Processing
+pillow==10.0.0
+opencv-python==4.8.0.74
+
+# Serialization
+msgpack==1.0.5
+protobuf==4.23.4
