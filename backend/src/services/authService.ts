@@ -68,8 +68,9 @@ class AuthService {
         user,
         ...tokens,
       };
-    } catch (error) {
-      throw new Error(`Registration failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Registration failed: ${errorMessage}`);
     }
   }
 
@@ -121,8 +122,9 @@ class AuthService {
         user,
         ...tokens,
       };
-    } catch (error) {
-      throw new Error(`Login failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Login failed: ${errorMessage}`);
     }
   }
 
@@ -172,8 +174,9 @@ class AuthService {
         user,
         ...tokens,
       };
-    } catch (error) {
-      throw new Error(`OTP verification failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`OTP verification failed: ${errorMessage}`);
     }
   }
 
@@ -255,8 +258,9 @@ class AuthService {
       );
 
       return { success: true, message: 'Password changed successfully' };
-    } catch (error) {
-      throw new Error(`Password change failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Password change failed: ${errorMessage}`);
     }
   }
 
@@ -293,8 +297,9 @@ class AuthService {
         message: 'Password reset email sent',
         resetToken, // Only return in development
       };
-    } catch (error) {
-      throw new Error(`Password reset request failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Password reset request failed: ${errorMessage}`);
     }
   }
 
@@ -320,8 +325,9 @@ class AuthService {
       );
 
       return { success: true, message: 'Password reset successfully' };
-    } catch (error) {
-      throw new Error(`Password reset failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Password reset failed: ${errorMessage}`);
     }
   }
 
@@ -333,8 +339,9 @@ class AuthService {
       // In production, add token to blacklist (Redis)
       // For now, just return success
       return { success: true, message: 'Logged out successfully' };
-    } catch (error) {
-      throw new Error(`Logout failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Logout failed: ${errorMessage}`);
     }
   }
 }

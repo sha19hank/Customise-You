@@ -152,9 +152,10 @@ class OrderService {
         totalAmount: order.total_amount,
         createdAt: order.created_at,
       };
-    } catch (error) {
+    } catch (error: unknown) {
       await client.query('ROLLBACK');
-      throw new Error(`Order creation failed: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Order creation failed: ${errorMessage}`);
     } finally {
       client.release();
     }
@@ -188,8 +189,9 @@ class OrderService {
         limit,
         totalPages: Math.ceil(countResult.rows[0].total / limit),
       };
-    } catch (error) {
-      throw new Error(`Failed to fetch orders: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to fetch orders: ${errorMessage}`);
     }
   }
 
@@ -221,7 +223,7 @@ class OrderService {
 
       // Get customizations for each item
       const items = await Promise.all(
-        itemsResult.rows.map(async (item) => {
+        itemsResult.rows.map(async (item: any) => {
           const customResult = await this.db.query(
             'SELECT * FROM order_customizations WHERE order_item_id = $1',
             [item.id]
@@ -251,8 +253,9 @@ class OrderService {
           ...(order.delivered_at ? [{ status: 'delivered', timestamp: order.delivered_at }] : []),
         ],
       };
-    } catch (error) {
-      throw new Error(`Failed to fetch order details: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to fetch order details: ${errorMessage}`);
     }
   }
 
@@ -288,8 +291,9 @@ class OrderService {
       }
 
       return result.rows[0];
-    } catch (error) {
-      throw new Error(`Failed to update order status: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to update order status: ${errorMessage}`);
     }
   }
 
@@ -323,8 +327,9 @@ class OrderService {
         limit,
         totalPages: Math.ceil(countResult.rows[0].total / limit),
       };
-    } catch (error) {
-      throw new Error(`Failed to fetch seller orders: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to fetch seller orders: ${errorMessage}`);
     }
   }
 
@@ -380,9 +385,10 @@ class OrderService {
         refundInitiated: true,
         estimatedRefundDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days
       };
-    } catch (error) {
+    } catch (error: unknown) {
       await client.query('ROLLBACK');
-      throw new Error(`Failed to cancel order: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to cancel order: ${errorMessage}`);
     } finally {
       client.release();
     }
