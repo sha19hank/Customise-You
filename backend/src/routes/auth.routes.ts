@@ -1,47 +1,65 @@
-// backend/src/routes/auth.routes.ts - Authentication Routes
+// backend/src/routes/auth.routes.ts
 
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from "express";
+import { AuthService } from "../services/authService";
+import { ValidationError } from "../middleware/errorHandler";
 
 const router = Router();
 
 /**
  * POST /auth/register
- * Register a new user
  */
-router.post('/register', (req: Request, res: Response) => {
-  res.json({ message: 'Register endpoint' });
-});
+router.post(
+  "/register",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, password, phone } = req.body;
+
+      if (!email || !password) {
+        throw new ValidationError("Email and password are required");
+      }
+
+      const user = await AuthService.register({
+        email,
+        password,
+        phone,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "User registered successfully",
+        data: user,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 /**
  * POST /auth/login
- * Login user
  */
-router.post('/login', (req: Request, res: Response) => {
-  res.json({ message: 'Login endpoint' });
-});
+router.post(
+  "/login",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, password } = req.body;
 
-/**
- * POST /auth/otp/request
- * Request OTP
- */
-router.post('/otp/request', (req: Request, res: Response) => {
-  res.json({ message: 'Request OTP endpoint' });
-});
+      if (!email || !password) {
+        throw new ValidationError("Email and password are required");
+      }
 
-/**
- * POST /auth/otp/verify
- * Verify OTP
- */
-router.post('/otp/verify', (req: Request, res: Response) => {
-  res.json({ message: 'Verify OTP endpoint' });
-});
+      const result = await AuthService.login({ email, password });
 
-/**
- * POST /auth/refresh
- * Refresh token
- */
-router.post('/refresh', (req: Request, res: Response) => {
-  res.json({ message: 'Refresh token endpoint' });
-});
+      res.status(200).json({
+        success: true,
+        message: "Login successful",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 export default router;
