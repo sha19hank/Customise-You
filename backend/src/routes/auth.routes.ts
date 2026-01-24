@@ -1,10 +1,12 @@
 // backend/src/routes/auth.routes.ts
 
 import { Router, Request, Response, NextFunction } from "express";
-import { AuthService } from "../services/authService";
+import AuthService from "../services/authService";
 import { ValidationError } from "../middleware/errorHandler";
+import { pool } from "../config/database";
 
 const router = Router();
+const authService = new AuthService(pool);
 
 /**
  * POST /auth/register
@@ -13,17 +15,13 @@ router.post(
   "/register",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { email, password, phone } = req.body;
+      const { email, password, phone, firstName, lastName } = req.body;
 
-      if (!email || !password) {
-        throw new ValidationError("Email and password are required");
+      if (!email || !password || !firstName || !lastName) {
+        throw new ValidationError("Email, password, first name, and last name are required");
       }
 
-      const user = await AuthService.register({
-        email,
-        password,
-        phone,
-      });
+      const user = await authService.register(email, phone || null, password, firstName, lastName);
 
       res.status(201).json({
         success: true,
@@ -49,11 +47,141 @@ router.post(
         throw new ValidationError("Email and password are required");
       }
 
-      const result = await AuthService.login({ email, password });
+      const result = await authService.login(email, password);
 
       res.status(200).json({
         success: true,
         message: "Login successful",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /auth/verify-otp
+ */
+router.post(
+  "/verify-otp",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { phone, otp } = req.body;
+
+      if (!phone || !otp) {
+        throw new ValidationError("Phone number and OTP are required");
+      }
+
+      const result = await authService.verifyOTP(phone, otp);
+
+      res.status(200).json({
+        success: true,
+        message: "OTP verified successfully",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /auth/refresh-token
+ */
+router.post(
+  "/refresh-token",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        throw new ValidationError("Refresh token is required");
+      }
+
+      const result = authService.refreshAccessToken(refreshToken);
+
+      res.status(200).json({
+        success: true,
+        message: "Token refreshed successfully",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /auth/change-password
+ */
+router.post(
+  "/change-password",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId, currentPassword, newPassword } = req.body;
+
+      if (!userId || !currentPassword || !newPassword) {
+        throw new ValidationError("User ID, current password, and new password are required");
+      }
+
+      const result = await authService.changePassword(userId, currentPassword, newPassword);
+
+      res.status(200).json({
+        success: true,
+        message: "Password changed successfully",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /auth/reset-password
+ */
+router.post(
+  "/reset-password",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { resetToken, newPassword } = req.body;
+
+      if (!resetToken || !newPassword) {
+        throw new ValidationError("Reset token and new password are required");
+      }
+
+      const result = await authService.resetPassword(resetToken, newPassword);
+
+      res.status(200).json({
+        success: true,
+        message: "Password reset successfully",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /auth/logout
+ */
+router.post(
+  "/logout",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId, token } = req.body;
+
+      if (!userId || !token) {
+        throw new ValidationError("User ID and token are required");
+      }
+
+      const result = await authService.logout(userId, token);
+
+      res.status(200).json({
+        success: true,
+        message: "Logged out successfully",
         data: result,
       });
     } catch (error) {

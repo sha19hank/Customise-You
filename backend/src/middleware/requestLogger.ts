@@ -2,6 +2,16 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { Logger } from 'winston';
+import Winston from 'winston';
+
+// Default logger for direct requestLogger export
+const defaultLogger = Winston.createLogger({
+  transports: [new Winston.transports.Console()],
+  format: Winston.format.combine(
+    Winston.format.timestamp(),
+    Winston.format.json()
+  ),
+});
 
 export function createRequestLogger(logger: Logger) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -32,3 +42,6 @@ export function createRequestLogger(logger: Logger) {
     next();
   };
 }
+
+// Export a default request logger using the default logger
+export const requestLogger = createRequestLogger(defaultLogger);

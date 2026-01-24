@@ -2,11 +2,17 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { Logger } from 'winston';
+import Winston from 'winston';
 
 interface ApiError extends Error {
   status?: number;
   code?: string;
 }
+
+// Default logger for direct error handler export
+const defaultLogger = Winston.createLogger({
+  transports: [new Winston.transports.Console()],
+});
 
 export function createErrorHandler(logger: Logger) {
   return (err: ApiError, _req: Request, res: Response, _next: NextFunction) => {
@@ -92,3 +98,5 @@ export class RateLimitError extends Error implements ApiError {
     this.name = 'RateLimitError';
   }
 }
+// Export a default error handler using the default logger
+export const errorHandler = createErrorHandler(defaultLogger);

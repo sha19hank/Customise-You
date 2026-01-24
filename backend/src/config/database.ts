@@ -2,7 +2,7 @@
 
 import { Pool, PoolClient } from 'pg';
 
-let pool: Pool;
+export let pool: Pool;
 
 export async function initializeDatabase(): Promise<Pool> {
   if (pool) {
