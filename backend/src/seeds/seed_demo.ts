@@ -24,11 +24,25 @@ export const seedDemoData = async (db: Pool) => {
   let sellerId: string;
 
   if (sellerExists.rows.length === 0) {
+    const sellerCountResult = await db.query('SELECT COUNT(*) as count FROM sellers');
+    const sellerCount = parseInt(sellerCountResult.rows[0].count, 10) + 1;
+    const badges: string[] = [];
+
+    if (sellerCount <= 1000) {
+      if (sellerCount <= 100) {
+        badges.push('FOUNDING_TIER_1');
+      } else if (sellerCount <= 500) {
+        badges.push('FOUNDING_TIER_2');
+      } else {
+        badges.push('FOUNDING_TIER_3');
+      }
+    }
+
     const sellerInsert = await db.query(
-      `INSERT INTO sellers (user_id, business_name, business_email, kyc_status, status)
-       VALUES ($1, $2, $3, 'verified', 'active')
+      `INSERT INTO sellers (user_id, business_name, business_email, kyc_status, status, badges)
+       VALUES ($1, $2, $3, 'verified', 'active', $4)
        RETURNING id`,
-      [userId, 'Demo Studio', demoEmail]
+      [userId, 'Demo Studio', demoEmail, JSON.stringify(badges)]
     );
     sellerId = sellerInsert.rows[0].id;
   } else {

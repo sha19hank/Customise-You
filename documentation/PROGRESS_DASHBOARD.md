@@ -20,6 +20,7 @@
 | Create database migrations | ✅ | 100% (17 tables) |
 | Seed initial data | ✅ | 100% (admin + categories) |
 | End-to-end API testing | ✅ | 100% (auth, RBAC, orders, payments) |
+| Monetization + seller badges | ✅ | 100% (commission, badges, boost) |
 | Verify service implementations | ✅ | 100% (7 services) |
 | Document everything | ✅ | 100% (updated) |
 | Commit to git | ✅ | 100% (latest commits) |
@@ -109,6 +110,12 @@
       - Admin + seller login
       - RBAC enforcement
       - Orders + payments flow
+
+   ✅ Seller Monetization & Badges
+      - Tiered commission at confirmation
+      - Transaction-level earnings
+      - Founding + milestone badges
+      - Discovery boost (popular sort)
    - Create Order ✅
    - Get Orders ✅
    - Order Details ✅

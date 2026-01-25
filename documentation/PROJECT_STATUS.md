@@ -1,7 +1,7 @@
 # CustomiseYou Platform - Current Project Status
 
 **Last Updated:** January 25, 2026  
-**Project Status:** Backend API + Database + Auth Middleware + Seeding + E2E Testing Complete ✅  
+**Project Status:** Backend API + Database + Auth + Seeding + E2E + Monetization Complete ✅  
 **Latest Commit:** `9fbf584` - fix: add dotenv config to migrate.ts and fix migrations table index
 
 ---
@@ -116,6 +116,12 @@
 - [x] Categories and products endpoints validated
 - [x] Order creation and retrieval validated
 - [x] Payment flow (non-Stripe) validated
+
+### Phase 8: Seller Monetization & Badges ✅
+- [x] Tiered commission logic in PaymentService
+- [x] Transaction-level gross/platform/seller earnings stored
+- [x] Founding + order milestone badges supported
+- [x] Discovery boost applied for popular sorting
 
 ### Phase 4: Dependency Management ✅
 - [x] **Backend Dependencies Installed** (751 packages)

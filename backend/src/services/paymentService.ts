@@ -135,20 +135,68 @@ class PaymentService {
       try {
         await client.query('BEGIN');
 
-        // Update transaction status
-        await client.query(
-          `UPDATE transactions 
-           SET payment_status = $1, completed_at = NOW() 
-           WHERE payment_gateway_reference = $2 OR transaction_id = $2`,
-          ['completed', transactionId]
+        const orderResult = await client.query(
+          'SELECT id, seller_id, user_id, total_amount FROM orders WHERE id = $1',
+          [orderId]
         );
 
-        // Update order payment status
+        if (orderResult.rows.length === 0) {
+          throw new Error('Order not found');
+        }
+
+        const order = orderResult.rows[0];
+
+        const completedCountResult = await client.query(
+          `SELECT COUNT(*) as count FROM orders WHERE seller_id = $1 AND status = 'completed'`,
+          [order.seller_id]
+        );
+
+        const completedCount = parseInt(completedCountResult.rows[0].count, 10);
+        const completedAfter = completedCount + 1;
+
+        let commissionRate = 0;
+        if (completedAfter >= 11 && completedAfter <= 50) {
+          commissionRate = 0.03;
+        } else if (completedAfter >= 51) {
+          commissionRate = 0.07;
+        }
+
+        const grossAmount = parseFloat(order.total_amount);
+        const platformFeeAmount = parseFloat((grossAmount * commissionRate).toFixed(2));
+        const sellerEarningAmount = parseFloat((grossAmount - platformFeeAmount).toFixed(2));
+
+        // Update transaction status + monetization fields
+        await client.query(
+          `UPDATE transactions 
+           SET payment_status = $1,
+               gross_amount = $2,
+               platform_fee_amount = $3,
+               seller_earning_amount = $4,
+               completed_at = NOW()
+           WHERE payment_gateway_reference = $5 OR transaction_id = $5`,
+          ['completed', grossAmount, platformFeeAmount, sellerEarningAmount, transactionId]
+        );
+
+        // Update order payment status + commission
         await client.query(
           `UPDATE orders 
-           SET payment_status = $1, confirmed_at = NOW(), status = $2
-           WHERE id = $3`,
-          ['completed', 'confirmed', orderId]
+           SET payment_status = $1, confirmed_at = NOW(), status = $2, platform_fee = $3
+           WHERE id = $4`,
+          ['completed', 'completed', platformFeeAmount, orderId]
+        );
+
+        // Assign seller badges based on completed order milestones
+        const sellerResult = await client.query('SELECT badges FROM sellers WHERE id = $1', [order.seller_id]);
+        const existingBadges = sellerResult.rows[0]?.badges || [];
+        const badgeSet = new Set<string>(existingBadges);
+
+        if (completedAfter === 1) badgeSet.add('FIRST_ORDER');
+        if (completedAfter === 10) badgeSet.add('FIRST_10_ORDERS');
+        if (completedAfter === 50) badgeSet.add('FIRST_50_ORDERS');
+
+        await client.query(
+          'UPDATE sellers SET badges = $1 WHERE id = $2',
+          [JSON.stringify(Array.from(badgeSet)), order.seller_id]
         );
 
         await client.query('COMMIT');

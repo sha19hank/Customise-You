@@ -64,13 +64,28 @@ class ProductService {
       const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
       // Sort order
+      const badgeBoost = `LEAST(0.05,
+        (CASE
+          WHEN s.badges ? 'FOUNDING_TIER_1' THEN 0.03
+          WHEN s.badges ? 'FOUNDING_TIER_2' THEN 0.02
+          WHEN s.badges ? 'FOUNDING_TIER_3' THEN 0.01
+          ELSE 0
+        END) +
+        (CASE
+          WHEN s.badges ? 'FIRST_50_ORDERS' THEN 0.01
+          WHEN s.badges ? 'FIRST_10_ORDERS' THEN 0.01
+          WHEN s.badges ? 'FIRST_ORDER' THEN 0.01
+          ELSE 0
+        END)
+      )`;
+
       let orderBy = 'p.created_at DESC';
       switch (filters.sortBy) {
         case 'newest':
           orderBy = 'p.created_at DESC';
           break;
         case 'popular':
-          orderBy = 'p.quantity_sold DESC, p.views_count DESC';
+          orderBy = `((p.quantity_sold * 2 + p.views_count) * (1 + ${badgeBoost})) DESC, p.created_at DESC`;
           break;
         case 'price_asc':
           orderBy = 'p.final_price ASC';
