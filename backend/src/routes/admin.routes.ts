@@ -3,7 +3,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../middleware/errorHandler';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
-import { pool } from '../config/database';
+import { getDatabase } from '../config/database';
 
 const router = Router();
 
@@ -20,7 +20,8 @@ router.get(
       const limit = parseInt(req.query.limit as string) || 20;
       const offset = (page - 1) * limit;
 
-      const result = await pool.query(
+      const db = await getDatabase();
+      const result = await db.query(
         `SELECT id, email, business_name, kyc_status, status, created_at
          FROM users
          WHERE role = $1
@@ -53,7 +54,8 @@ router.put(
         throw new ValidationError('Seller ID and status are required');
       }
 
-      const result = await pool.query(
+      const db = await getDatabase();
+      const result = await db.query(
         `UPDATE users 
          SET kyc_status = $1, kyc_notes = $2, kyc_verified_at = NOW()
          WHERE id = $3 AND role = 'seller'
@@ -79,12 +81,13 @@ router.get(
   '/stats',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
       const [users, sellers, products, orders, revenue] = await Promise.all([
-        pool.query('SELECT COUNT(*) as count FROM users WHERE role = $1', ['customer']),
-        pool.query('SELECT COUNT(*) as count FROM users WHERE role = $1', ['seller']),
-        pool.query('SELECT COUNT(*) as count FROM products WHERE status = $1', ['active']),
-        pool.query('SELECT COUNT(*) as count FROM orders'),
-        pool.query('SELECT SUM(total_amount) as total FROM orders WHERE payment_status = $1', ['paid']),
+        db.query('SELECT COUNT(*) as count FROM users WHERE role = $1', ['user']),
+        db.query('SELECT COUNT(*) as count FROM users WHERE role = $1', ['seller']),
+        db.query('SELECT COUNT(*) as count FROM products WHERE status = $1', ['active']),
+        db.query('SELECT COUNT(*) as count FROM orders'),
+        db.query('SELECT SUM(total_amount) as total FROM orders WHERE payment_status = $1', ['completed']),
       ]);
 
       res.status(200).json({

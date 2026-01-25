@@ -1,7 +1,7 @@
 # CustomiseYou Platform - Current Project Status
 
 **Last Updated:** January 25, 2026  
-**Project Status:** Backend API + Database + Auth Middleware Complete ✅  
+**Project Status:** Backend API + Database + Auth Middleware + Seeding + E2E Testing Complete ✅  
 **Latest Commit:** `9fbf584` - fix: add dotenv config to migrate.ts and fix migrations table index
 
 ---
@@ -104,6 +104,19 @@
 - [x] Migration runner (TypeScript) with status/up/down/reset
 - [x] Database fully migrated and verified
 
+### Phase 6: Seed Data ✅
+- [x] Admin user seeding (idempotent)
+- [x] Core categories seeded
+- [x] Optional demo seller/products (feature-flagged)
+
+### Phase 7: E2E API Validation ✅
+- [x] Server startup verified (Redis optional in dev)
+- [x] Admin + seller login validated
+- [x] RBAC enforcement verified
+- [x] Categories and products endpoints validated
+- [x] Order creation and retrieval validated
+- [x] Payment flow (non-Stripe) validated
+
 ### Phase 4: Dependency Management ✅
 - [x] **Backend Dependencies Installed** (751 packages)
   - Express.js + TypeScript
@@ -134,6 +147,7 @@
 - Role-based access control in place
 - Database migrated (17 tables)
 - Error handling & logging setup
+- Redis optional for local testing via `REDIS_OPTIONAL=true`
 
 ### ⏳ Frontend (Next.js Web App): PENDING
 - Package.json defined

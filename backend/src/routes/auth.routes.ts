@@ -4,10 +4,9 @@ import { Router, Request, Response, NextFunction } from "express";
 import AuthService from "../services/authService";
 import { ValidationError } from "../middleware/errorHandler";
 import { requireAuth } from "../middleware/authMiddleware";
-import { pool } from "../config/database";
+import { getDatabase } from "../config/database";
 
 const router = Router();
-const authService = new AuthService(pool);
 
 /**
  * POST /auth/register
@@ -16,6 +15,8 @@ router.post(
   "/register",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const authService = new AuthService(db);
       const { email, password, phone, firstName, lastName } = req.body;
 
       if (!email || !password || !firstName || !lastName) {
@@ -42,6 +43,8 @@ router.post(
   "/login",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const authService = new AuthService(db);
       const { email, password } = req.body;
 
       if (!email || !password) {
@@ -68,6 +71,8 @@ router.post(
   "/verify-otp",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const authService = new AuthService(db);
       const { phone, otp } = req.body;
 
       if (!phone || !otp) {
@@ -94,6 +99,8 @@ router.post(
   "/refresh-token",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const authService = new AuthService(db);
       const { refreshToken } = req.body;
 
       if (!refreshToken) {
@@ -121,6 +128,8 @@ router.post(
   requireAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const authService = new AuthService(db);
       const { userId, currentPassword, newPassword } = req.body;
 
       if (!userId || !currentPassword || !newPassword) {
@@ -147,6 +156,8 @@ router.post(
   "/reset-password",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const authService = new AuthService(db);
       const { resetToken, newPassword } = req.body;
 
       if (!resetToken || !newPassword) {
@@ -174,6 +185,8 @@ router.post(
   requireAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const authService = new AuthService(db);
       const { userId, token } = req.body;
 
       if (!userId || !token) {

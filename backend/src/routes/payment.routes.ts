@@ -4,10 +4,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import PaymentService from '../services/paymentService';
 import { ValidationError } from '../middleware/errorHandler';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
-import { pool } from '../config/database';
+import { getDatabase } from '../config/database';
 
 const router = Router();
-const paymentService = new PaymentService(pool);
 
 /**
  * POST /payments/create-intent - Create payment intent
@@ -18,6 +17,8 @@ router.post(
   requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const paymentService = new PaymentService(db);
       const { orderId, amount, currency, paymentMethod, paymentMethodId } = req.body;
 
       if (!orderId || !amount || !currency || !paymentMethod) {
@@ -51,6 +52,8 @@ router.post(
   requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const paymentService = new PaymentService(db);
       const { orderId, transactionId } = req.body;
 
       if (!orderId || !transactionId) {
@@ -78,6 +81,8 @@ router.get(
   requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const paymentService = new PaymentService(db);
       const { orderId } = req.params;
 
       if (!orderId) {
@@ -105,6 +110,8 @@ router.post(
   requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const paymentService = new PaymentService(db);
       const { orderId, amount, reason } = req.body;
 
       if (!orderId || !amount || !reason) {

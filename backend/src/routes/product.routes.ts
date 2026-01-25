@@ -3,10 +3,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import ProductService from '../services/productService';
 import { ValidationError } from '../middleware/errorHandler';
-import { pool } from '../config/database';
+import { getDatabase } from '../config/database';
 
 const router = Router();
-const productService = new ProductService(pool);
 
 /**
  * GET /products - Get products with filters
@@ -15,6 +14,8 @@ router.get(
   '/',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const productService = new ProductService(db);
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       
@@ -52,6 +53,8 @@ router.get(
   '/search',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const productService = new ProductService(db);
       const query = req.query.q as string;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
@@ -79,12 +82,35 @@ router.get(
 );
 
 /**
+ * GET /categories - Get all categories
+ */
+router.get(
+  '/categories',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const db = await getDatabase();
+      const productService = new ProductService(db);
+      const categories = await productService.getCategories();
+
+      res.status(200).json({
+        success: true,
+        data: categories.data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * GET /products/:id - Get product details
  */
 router.get(
   '/:id',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const productService = new ProductService(db);
       const { id } = req.params;
 
       if (!id) {
@@ -96,25 +122,6 @@ router.get(
       res.status(200).json({
         success: true,
         data: product,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * GET /categories - Get all categories
- */
-router.get(
-  '/categories',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const categories = await productService.getCategories();
-
-      res.status(200).json({
-        success: true,
-        data: categories.data,
       });
     } catch (error) {
       next(error);

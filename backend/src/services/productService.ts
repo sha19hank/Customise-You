@@ -70,7 +70,7 @@ class ProductService {
           orderBy = 'p.created_at DESC';
           break;
         case 'popular':
-          orderBy = 'p.sales_count DESC, p.views_count DESC';
+          orderBy = 'p.quantity_sold DESC, p.views_count DESC';
           break;
         case 'price_asc':
           orderBy = 'p.final_price ASC';
@@ -95,10 +95,10 @@ class ProductService {
       const productsQuery = `
         SELECT 
           p.*,
-          u.business_name as seller_name,
-          u.average_rating as seller_rating
+          s.business_name as seller_name,
+          s.average_rating as seller_rating
         FROM products p
-        LEFT JOIN users u ON p.seller_id = u.id
+        LEFT JOIN sellers s ON p.seller_id = s.id
         ${whereClause}
         ORDER BY ${orderBy}
         LIMIT $${paramCount} OFFSET $${paramCount + 1}
@@ -128,10 +128,10 @@ class ProductService {
       // Get product details
       const productResult = await this.db.query(
         `SELECT p.*, 
-                u.id as seller_id, u.business_name as seller_name, 
-                u.average_rating as seller_rating, u.total_orders as seller_total_orders
+                s.id as seller_id, s.business_name as seller_name, 
+                s.average_rating as seller_rating, s.total_orders as seller_total_orders
          FROM products p
-         LEFT JOIN users u ON p.seller_id = u.id
+         LEFT JOIN sellers s ON p.seller_id = s.id
          WHERE p.id = $1 AND p.status = 'active'`,
         [productId]
       );

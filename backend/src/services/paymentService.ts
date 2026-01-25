@@ -1,6 +1,7 @@
 // backend/src/services/paymentService.ts - Payment Processing Service
 
 import { Pool } from 'pg';
+import { v4 as uuidv4 } from 'uuid';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -38,6 +39,10 @@ class PaymentService {
       }
 
       const order = orderResult.rows[0];
+      const transactionId = uuidv4();
+      const platformFee = 0;
+      const processingFee = 0;
+      const netAmount = paymentData.amount - platformFee - processingFee;
 
       if (paymentData.paymentMethod === 'stripe') {
         // Create Stripe payment intent
@@ -53,30 +58,66 @@ class PaymentService {
         // Save transaction
         await this.db.query(
           `INSERT INTO transactions (
-            order_id, amount, currency, payment_method, 
-            payment_provider, provider_transaction_id, status
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            id, transaction_id, order_id, payer_id, payee_id,
+            amount, currency, payment_method, payment_status,
+            payment_gateway_reference, platform_fee, processing_fee,
+            net_amount, refund_status
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
           [
+            uuidv4(),
+            transactionId,
             paymentData.orderId,
+            order.user_id,
+            order.seller_id,
             paymentData.amount,
             paymentData.currency,
             paymentData.paymentMethod,
-            'stripe',
-            paymentIntent.id,
             'pending',
+            paymentIntent.id,
+            platformFee,
+            processingFee,
+            netAmount,
+            'none',
           ]
         );
 
         return {
           clientSecret: paymentIntent.client_secret,
           paymentIntentId: paymentIntent.id,
+          transactionId,
         };
       }
 
       // For other payment methods (Razorpay, PayPal, COD)
+      await this.db.query(
+        `INSERT INTO transactions (
+          id, transaction_id, order_id, payer_id, payee_id,
+          amount, currency, payment_method, payment_status,
+          payment_gateway_reference, platform_fee, processing_fee,
+          net_amount, refund_status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+        [
+          uuidv4(),
+          transactionId,
+          paymentData.orderId,
+          order.user_id,
+          order.seller_id,
+          paymentData.amount,
+          paymentData.currency,
+          paymentData.paymentMethod,
+          'pending',
+          null,
+          platformFee,
+          processingFee,
+          netAmount,
+          'none',
+        ]
+      );
+
       return {
         message: 'Payment method not fully implemented yet',
         orderId: paymentData.orderId,
+        transactionId,
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -97,8 +138,8 @@ class PaymentService {
         // Update transaction status
         await client.query(
           `UPDATE transactions 
-           SET status = $1, completed_at = NOW() 
-           WHERE provider_transaction_id = $2`,
+           SET payment_status = $1, completed_at = NOW() 
+           WHERE payment_gateway_reference = $2 OR transaction_id = $2`,
           ['completed', transactionId]
         );
 
@@ -107,7 +148,7 @@ class PaymentService {
           `UPDATE orders 
            SET payment_status = $1, confirmed_at = NOW(), status = $2
            WHERE id = $3`,
-          ['paid', 'confirmed', orderId]
+          ['completed', 'confirmed', orderId]
         );
 
         await client.query('COMMIT');
@@ -167,7 +208,7 @@ class PaymentService {
         // Get original transaction
         const transactionResult = await client.query(
           `SELECT * FROM transactions 
-           WHERE order_id = $1 AND status = 'completed'
+           WHERE order_id = $1 AND payment_status = 'completed'
            ORDER BY created_at DESC LIMIT 1`,
           [orderId]
         );
@@ -179,9 +220,9 @@ class PaymentService {
         const transaction = transactionResult.rows[0];
 
         // Process Stripe refund
-        if (transaction.payment_provider === 'stripe') {
+        if (transaction.payment_method === 'stripe' && transaction.payment_gateway_reference) {
           const refund = await stripe.refunds.create({
-            payment_intent: transaction.provider_transaction_id,
+            payment_intent: transaction.payment_gateway_reference,
             amount: Math.round(amount * 100),
             reason: 'requested_by_customer',
           });
@@ -189,20 +230,29 @@ class PaymentService {
           // Record refund
           await client.query(
             `INSERT INTO transactions (
-              order_id, amount, currency, payment_method, 
-              payment_provider, provider_transaction_id, 
-              transaction_type, status, refund_reason
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+              id, transaction_id, order_id, payer_id, payee_id,
+              amount, currency, payment_method, payment_status,
+              payment_gateway_reference, platform_fee, processing_fee,
+              net_amount, refund_status, refund_amount, refund_reason, refund_processed_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
             [
+              uuidv4(),
+              uuidv4(),
               orderId,
+              transaction.payer_id,
+              transaction.payee_id,
               amount,
               transaction.currency,
               transaction.payment_method,
-              'stripe',
+              'refunded',
               refund.id,
-              'refund',
-              'completed',
+              0,
+              0,
+              amount,
+              'full',
+              amount,
               reason,
+              new Date(),
             ]
           );
         }
@@ -212,7 +262,7 @@ class PaymentService {
           `UPDATE orders 
            SET payment_status = $1, status = $2 
            WHERE id = $3`,
-          ['refunded', 'cancelled', orderId]
+          ['refunded', 'refunded', orderId]
         );
 
         await client.query('COMMIT');

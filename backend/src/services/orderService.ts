@@ -105,6 +105,9 @@ class OrderService {
 
       const order = orderResult.rows[0];
 
+      const isUuid = (value: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
       // Create order items
       for (const item of items) {
         const orderItemId = uuidv4();
@@ -124,6 +127,9 @@ class OrderService {
 
         // Store customization details
         for (const [key, value] of Object.entries(item.customizations)) {
+          if (!isUuid(key)) {
+            continue;
+          }
           const customizationId = uuidv4();
           await client.query(
             `INSERT INTO order_customizations (

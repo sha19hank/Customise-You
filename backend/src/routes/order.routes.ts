@@ -4,10 +4,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import OrderService from '../services/orderService';
 import { ValidationError } from '../middleware/errorHandler';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
-import { pool } from '../config/database';
+import { getDatabase } from '../config/database';
 
 const router = Router();
-const orderService = new OrderService(pool);
 
 /**
  * POST /orders - Create new order
@@ -18,6 +17,8 @@ router.post(
   requireRole('user'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const orderService = new OrderService(db);
       const { userId, cartItems, shippingAddressId, billingAddressId, shippingMethod, paymentMethod, couponCode } = req.body;
 
       if (!userId || !cartItems || cartItems.length === 0 || !shippingAddressId || !paymentMethod) {
@@ -54,6 +55,8 @@ router.get(
   requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const orderService = new OrderService(db);
       const { id } = req.params;
 
       if (!id) {
@@ -81,6 +84,8 @@ router.get(
   requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const orderService = new OrderService(db);
       const { userId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
@@ -110,6 +115,8 @@ router.patch(
   requireRole('seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const orderService = new OrderService(db);
       const { id } = req.params;
       const { status, trackingNumber, notes } = req.body;
 
@@ -139,6 +146,8 @@ router.post(
   requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const orderService = new OrderService(db);
       const { id } = req.params;
       const { reason } = req.body;
 

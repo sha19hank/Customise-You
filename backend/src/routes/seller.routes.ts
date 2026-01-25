@@ -3,7 +3,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../middleware/errorHandler';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
-import { pool } from '../config/database';
+import { getDatabase } from '../config/database';
 
 const router = Router();
 
@@ -25,10 +25,11 @@ router.get(
         throw new ValidationError('Seller ID is required');
       }
 
-      const result = await pool.query(
+      const db = await getDatabase();
+      const result = await db.query(
         `SELECT id, name, slug, base_price, final_price, quantity_available,
                 status, is_customizable, average_rating, total_reviews,
-                views_count, sales_count, created_at
+                views_count, quantity_sold, created_at
          FROM products
          WHERE seller_id = $1
          ORDER BY created_at DESC
@@ -62,7 +63,8 @@ router.get(
         throw new ValidationError('Seller ID is required');
       }
 
-      const result = await pool.query(
+      const db = await getDatabase();
+      const result = await db.query(
         `SELECT o.id, o.order_number, o.status, o.total_amount, o.created_at,
                 u.first_name, u.last_name, u.email
          FROM orders o
@@ -96,11 +98,12 @@ router.get(
         throw new ValidationError('Seller ID is required');
       }
 
+      const db = await getDatabase();
       const [productsCount, ordersCount, revenue, ratings] = await Promise.all([
-        pool.query('SELECT COUNT(*) as count FROM products WHERE seller_id = $1', [sellerId]),
-        pool.query('SELECT COUNT(*) as count FROM orders WHERE seller_id = $1', [sellerId]),
-        pool.query('SELECT SUM(total_amount) as total FROM orders WHERE seller_id = $1 AND payment_status = $2', [sellerId, 'paid']),
-        pool.query('SELECT average_rating FROM users WHERE id = $1', [sellerId]),
+        db.query('SELECT COUNT(*) as count FROM products WHERE seller_id = $1', [sellerId]),
+        db.query('SELECT COUNT(*) as count FROM orders WHERE seller_id = $1', [sellerId]),
+        db.query('SELECT SUM(total_amount) as total FROM orders WHERE seller_id = $1 AND payment_status = $2', [sellerId, 'completed']),
+        db.query('SELECT average_rating FROM users WHERE id = $1', [sellerId]),
       ]);
 
       res.status(200).json({

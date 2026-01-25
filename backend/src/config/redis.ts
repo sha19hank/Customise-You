@@ -5,8 +5,41 @@ import type { RedisClientType } from 'redis';
 
 let redisClient: RedisClientType;
 
+const createInMemoryRedisClient = (): RedisClientType => {
+  const store = new Map<string, string>();
+
+  const client = {
+    on: () => client,
+    connect: async () => undefined,
+    ping: async () => 'PONG',
+    quit: async () => undefined,
+    set: async (key: string, value: string) => {
+      store.set(key, value);
+      return 'OK';
+    },
+    setEx: async (key: string, _ttl: number, value: string) => {
+      store.set(key, value);
+      return 'OK';
+    },
+    get: async (key: string) => store.get(key) ?? null,
+    del: async (key: string) => (store.delete(key) ? 1 : 0),
+    flushDb: async () => {
+      store.clear();
+      return 'OK';
+    },
+  };
+
+  return client as unknown as RedisClientType;
+};
+
 export async function initializeRedis(): Promise<RedisClientType> {
   if (redisClient) {
+    return redisClient;
+  }
+
+  if (process.env.REDIS_DISABLED === 'true' || process.env.REDIS_OPTIONAL === 'true') {
+    redisClient = createInMemoryRedisClient();
+    console.log('⚠️ Redis disabled; using in-memory cache');
     return redisClient;
   }
 

@@ -4,10 +4,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import ReviewService from '../services/reviewService';
 import { ValidationError } from '../middleware/errorHandler';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
-import { pool } from '../config/database';
+import { getDatabase } from '../config/database';
 
 const router = Router();
-const reviewService = new ReviewService(pool);
 
 /**
  * POST /reviews - Create new review
@@ -18,6 +17,8 @@ router.post(
   requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const reviewService = new ReviewService(db);
       const { userId, productId, orderId, rating, title, content, customizationQualityRating, images } = req.body;
 
       if (!userId || !productId || !rating || !title || !content) {
@@ -57,6 +58,8 @@ router.get(
   '/product/:productId',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const reviewService = new ReviewService(db);
       const { productId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
@@ -93,6 +96,8 @@ router.post(
   requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const reviewService = new ReviewService(db);
       const { id } = req.params;
       const { userId } = req.body;
 

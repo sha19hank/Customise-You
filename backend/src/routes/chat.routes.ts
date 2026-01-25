@@ -4,10 +4,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import ChatService from '../services/chatService';
 import { ValidationError } from '../middleware/errorHandler';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
-import { pool } from '../config/database';
+import { getDatabase } from '../config/database';
 
 const router = Router();
-const chatService = new ChatService(pool);
 
 /**
  * GET /messages - Get user's conversations
@@ -18,6 +17,8 @@ router.get(
   requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const chatService = new ChatService(db);
       const userId = req.query.userId as string;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
@@ -51,6 +52,8 @@ router.get(
   requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const chatService = new ChatService(db);
       const { userId } = req.params;
       const currentUserId = req.query.currentUserId as string;
       const page = parseInt(req.query.page as string) || 1;
@@ -85,6 +88,8 @@ router.post(
   requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const chatService = new ChatService(db);
       const { senderId, recipientId, messageType, content, orderId, productId } = req.body;
 
       if (!senderId || !recipientId || !content) {
@@ -120,6 +125,8 @@ router.post(
   requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const chatService = new ChatService(db);
       const { userId, otherUserId } = req.body;
 
       if (!userId || !otherUserId) {

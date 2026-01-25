@@ -4,10 +4,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import UserService from '../services/userService';
 import { ValidationError } from '../middleware/errorHandler';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
-import { pool } from '../config/database';
+import { getDatabase } from '../config/database';
 
 const router = Router();
-const userService = new UserService(pool);
 
 router.use(requireAuth, requireRole('user', 'admin'));
 
@@ -18,6 +17,8 @@ router.get(
   '/:id',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const userService = new UserService(db);
       const { id } = req.params;
 
       if (!id) {
@@ -43,6 +44,8 @@ router.patch(
   '/:id',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const userService = new UserService(db);
       const { id } = req.params;
       const { firstName, lastName, phone, profileImageUrl, dateOfBirth } = req.body;
 
@@ -76,6 +79,8 @@ router.get(
   '/:id/addresses',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const userService = new UserService(db);
       const { id } = req.params;
 
       if (!id) {
@@ -101,14 +106,18 @@ router.post(
   '/:id/addresses',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const userService = new UserService(db);
       const { id } = req.params;
-      const { addressLine1, addressLine2, city, state, postalCode, country, isDefault, addressType } = req.body;
+      const { fullName, phoneNumber, addressLine1, addressLine2, city, state, postalCode, country, isDefault, addressType, label } = req.body;
 
-      if (!id || !addressLine1 || !city || !state || !postalCode || !country) {
-        throw new ValidationError('User ID and address details are required');
+      if (!id || !fullName || !phoneNumber || !addressLine1 || !city || !state || !postalCode || !country || !addressType) {
+        throw new ValidationError('User ID, full name, phone number, address details, and address type are required');
       }
 
       const address = await userService.addAddress(id, {
+        fullName,
+        phoneNumber,
         addressLine1,
         addressLine2,
         city,
@@ -117,6 +126,7 @@ router.post(
         country,
         isDefault,
         addressType,
+        label,
       });
 
       res.status(201).json({
@@ -137,6 +147,8 @@ router.patch(
   '/:id/addresses/:addressId',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const userService = new UserService(db);
       const { id, addressId } = req.params;
 
       if (!id || !addressId) {
@@ -163,6 +175,8 @@ router.delete(
   '/:id/addresses/:addressId',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const db = await getDatabase();
+      const userService = new UserService(db);
       const { id, addressId } = req.params;
 
       if (!id || !addressId) {

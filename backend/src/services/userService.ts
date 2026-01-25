@@ -11,6 +11,8 @@ export interface UpdateProfileRequest {
 }
 
 export interface AddressRequest {
+  fullName: string;
+  phoneNumber: string;
   addressLine1: string;
   addressLine2?: string;
   city: string;
@@ -18,7 +20,8 @@ export interface AddressRequest {
   postalCode: string;
   country: string;
   isDefault?: boolean;
-  addressType: 'home' | 'work' | 'other';
+  addressType: 'shipping' | 'billing' | 'both';
+  label?: string;
 }
 
 class UserService {
@@ -148,12 +151,17 @@ class UserService {
 
         const result = await client.query(
           `INSERT INTO addresses (
-            user_id, address_line1, address_line2, city, state, 
-            postal_code, country, is_default, address_type
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            user_id, full_name, phone_number, label, type,
+            address_line_1, address_line_2, city, state,
+            postal_code, country, is_default
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
           RETURNING *`,
           [
             userId,
+            addressData.fullName,
+            addressData.phoneNumber,
+            addressData.label || 'Primary',
+            addressData.addressType,
             addressData.addressLine1,
             addressData.addressLine2,
             addressData.city,
@@ -161,7 +169,6 @@ class UserService {
             addressData.postalCode,
             addressData.country,
             addressData.isDefault || false,
-            addressData.addressType,
           ]
         );
 
@@ -213,7 +220,16 @@ class UserService {
 
         Object.entries(addressData).forEach(([key, value]) => {
           if (value !== undefined) {
-            const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+            const mapping: Record<string, string> = {
+              addressLine1: 'address_line_1',
+              addressLine2: 'address_line_2',
+              postalCode: 'postal_code',
+              addressType: 'type',
+              fullName: 'full_name',
+              phoneNumber: 'phone_number',
+            };
+
+            const snakeKey = mapping[key] || key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
             updates.push(`${snakeKey} = $${paramCount}`);
             values.push(value);
             paramCount++;

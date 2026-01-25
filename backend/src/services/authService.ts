@@ -51,7 +51,7 @@ class AuthService {
       const result = await this.db.query(
         `INSERT INTO users (id, email, phone, first_name, last_name, password_hash, status, registration_source)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING id, email, first_name, last_name, phone`,
+         RETURNING id, email, first_name, last_name, phone, role`,
         [userId, email, phone, firstName, lastName, hashedPassword, 'active', 'mobile_app']
       );
 
@@ -61,7 +61,7 @@ class AuthService {
       const tokens = this.generateTokens({
         userId: user.id,
         email: user.email,
-        role: 'user',
+        role: (user.role as AuthPayload['role']) || 'user',
       });
 
       return {
@@ -81,7 +81,7 @@ class AuthService {
     try {
       // Find user by email
       const result = await this.db.query(
-        'SELECT id, email, password_hash, first_name, last_name, phone, status FROM users WHERE email = $1',
+        'SELECT id, email, password_hash, first_name, last_name, phone, status, role FROM users WHERE email = $1',
         [email]
       );
 
@@ -112,7 +112,7 @@ class AuthService {
       const tokens = this.generateTokens({
         userId: user.id,
         email: user.email,
-        role: 'user',
+        role: (user.role as AuthPayload['role']) || 'user',
       });
 
       // Remove password from response
@@ -149,7 +149,7 @@ class AuthService {
         const insertResult = await this.db.query(
           `INSERT INTO users (id, phone, phone_verified, phone_verified_at, status, registration_source)
            VALUES ($1, $2, true, NOW(), 'active', 'mobile_app')
-           RETURNING id, email, first_name, last_name, phone`,
+           RETURNING id, email, first_name, last_name, phone, role`,
           [userId, phone]
         );
         user = insertResult.rows[0];
@@ -166,7 +166,7 @@ class AuthService {
       const tokens = this.generateTokens({
         userId: user.id,
         email: user.email || '',
-        role: 'user',
+        role: (user.role as AuthPayload['role']) || 'user',
       });
 
       return {

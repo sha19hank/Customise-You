@@ -3,7 +3,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../middleware/errorHandler';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
-import { pool } from '../config/database';
+import { getDatabase } from '../config/database';
 
 const router = Router();
 
@@ -20,7 +20,8 @@ router.get(
         throw new ValidationError('Product ID is required');
       }
 
-      const result = await pool.query(
+      const db = await getDatabase();
+      const result = await db.query(
         `SELECT * FROM customizations
          WHERE product_id = $1 AND is_active = true
          ORDER BY display_order ASC`,
@@ -52,7 +53,8 @@ router.post(
         throw new ValidationError('Product ID, type, and label are required');
       }
 
-      const result = await pool.query(
+      const db = await getDatabase();
+      const result = await db.query(
         `INSERT INTO customizations (
           product_id, type, label, description, is_required,
           input_type, price_adjustment, is_active

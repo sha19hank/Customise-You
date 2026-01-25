@@ -18,6 +18,8 @@
 | Implement all routes | ✅ | 100% (11 modules, 44+ endpoints) |
 | Implement auth middleware | ✅ | 100% (JWT + RBAC) |
 | Create database migrations | ✅ | 100% (17 tables) |
+| Seed initial data | ✅ | 100% (admin + categories) |
+| End-to-end API testing | ✅ | 100% (auth, RBAC, orders, payments) |
 | Verify service implementations | ✅ | 100% (7 services) |
 | Document everything | ✅ | 100% (updated) |
 | Commit to git | ✅ | 100% (latest commits) |
@@ -96,6 +98,17 @@
       - 17 tables + enums + indexes
       - TypeScript migration runner
       - Verified on PostgreSQL 18
+
+   ✅ Seed Data
+      - Admin user (idempotent)
+      - Core categories
+      - Optional demo seller/products
+
+   ✅ E2E API Testing
+      - Server boot with Redis optional
+      - Admin + seller login
+      - RBAC enforcement
+      - Orders + payments flow
    - Create Order ✅
    - Get Orders ✅
    - Order Details ✅

@@ -3,7 +3,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../middleware/errorHandler';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
-import { pool } from '../config/database';
+import { getDatabase } from '../config/database';
 
 const router = Router();
 
@@ -25,7 +25,8 @@ router.get(
         throw new ValidationError('User ID is required');
       }
 
-      const result = await pool.query(
+      const db = await getDatabase();
+      const result = await db.query(
         `SELECT * FROM notifications
          WHERE user_id = $1
          ORDER BY created_at DESC
@@ -58,7 +59,8 @@ router.post(
         throw new ValidationError('Notification IDs are required');
       }
 
-      await pool.query(
+      const db = await getDatabase();
+      await db.query(
         `UPDATE notifications 
          SET is_read = true, read_at = NOW()
          WHERE id = ANY($1::uuid[])`,
