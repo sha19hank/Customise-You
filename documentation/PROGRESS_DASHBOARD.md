@@ -21,6 +21,7 @@
 | Seed initial data | ✅ | 100% (admin + categories) |
 | End-to-end API testing | ✅ | 100% (auth, RBAC, orders, payments) |
 | Monetization + seller badges | ✅ | 100% (commission, badges, boost) |
+| Seller EXP + levels | ✅ | 100% (exp, levels, discovery boost) |
 | Verify service implementations | ✅ | 100% (7 services) |
 | Document everything | ✅ | 100% (updated) |
 | Commit to git | ✅ | 100% (latest commits) |
@@ -116,6 +117,11 @@
       - Transaction-level earnings
       - Founding + milestone badges
       - Discovery boost (popular sort)
+
+   ✅ Seller EXP & Levels
+      - EXP on completed orders & reviews
+      - Level calculation helper
+      - Level-based discovery boost (max 3%)
    - Create Order ✅
    - Get Orders ✅
    - Order Details ✅

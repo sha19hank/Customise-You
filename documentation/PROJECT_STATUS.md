@@ -123,6 +123,12 @@
 - [x] Founding + order milestone badges supported
 - [x] Discovery boost applied for popular sorting
 
+### Phase 9: Seller EXP & Levels ✅
+- [x] Seller EXP/level columns (additive)
+- [x] Transactional EXP updates (orders + reviews)
+- [x] Deterministic level calculation helper
+- [x] Level-based discovery boost (max 3%)
+
 ### Phase 4: Dependency Management ✅
 - [x] **Backend Dependencies Installed** (751 packages)
   - Express.js + TypeScript

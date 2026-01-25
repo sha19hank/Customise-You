@@ -79,13 +79,15 @@ class ProductService {
         END)
       )`;
 
+      const levelBoost = `LEAST(0.03, COALESCE(s.level, 1) * 0.005)`;
+
       let orderBy = 'p.created_at DESC';
       switch (filters.sortBy) {
         case 'newest':
           orderBy = 'p.created_at DESC';
           break;
         case 'popular':
-          orderBy = `((p.quantity_sold * 2 + p.views_count) * (1 + ${badgeBoost})) DESC, p.created_at DESC`;
+          orderBy = `((p.quantity_sold * 2 + p.views_count) * (1 + ${badgeBoost} + ${levelBoost})) DESC, p.created_at DESC`;
           break;
         case 'price_asc':
           orderBy = 'p.final_price ASC';
