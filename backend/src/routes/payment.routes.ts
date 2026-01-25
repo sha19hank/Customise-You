@@ -4,7 +4,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import PaymentService from '../services/paymentService';
 import { ValidationError } from '../middleware/errorHandler';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
+import { validateBody } from '../middleware/validate';
 import { getDatabase } from '../config/database';
+import { confirmPaymentBodySchema, createPaymentIntentBodySchema } from '../validators/payment.schema';
 
 const router = Router();
 
@@ -15,6 +17,7 @@ router.post(
   '/create-intent',
   requireAuth,
   requireRole('user', 'admin'),
+  validateBody(createPaymentIntentBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const db = await getDatabase();
@@ -50,6 +53,7 @@ router.post(
   '/confirm',
   requireAuth,
   requireRole('user', 'admin'),
+  validateBody(confirmPaymentBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const db = await getDatabase();

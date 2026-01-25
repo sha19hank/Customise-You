@@ -4,7 +4,13 @@ import { Router, Request, Response, NextFunction } from 'express';
 import OrderService from '../services/orderService';
 import { ValidationError } from '../middleware/errorHandler';
 import { requireAuth, requireRole } from '../middleware/authMiddleware';
+import { validateBody, validateParams } from '../middleware/validate';
 import { getDatabase } from '../config/database';
+import {
+  createOrderBodySchema,
+  orderIdParamsSchema,
+  updateOrderStatusBodySchema,
+} from '../validators/order.schema';
 
 const router = Router();
 
@@ -15,6 +21,7 @@ router.post(
   '/',
   requireAuth,
   requireRole('user'),
+  validateBody(createOrderBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const db = await getDatabase();
@@ -113,6 +120,8 @@ router.patch(
   '/:id/status',
   requireAuth,
   requireRole('seller', 'admin'),
+  validateParams(orderIdParamsSchema),
+  validateBody(updateOrderStatusBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const db = await getDatabase();

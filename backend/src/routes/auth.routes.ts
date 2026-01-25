@@ -4,7 +4,14 @@ import { Router, Request, Response, NextFunction } from "express";
 import AuthService from "../services/authService";
 import { ValidationError } from "../middleware/errorHandler";
 import { requireAuth } from "../middleware/authMiddleware";
+import { validateBody } from "../middleware/validate";
 import { getDatabase } from "../config/database";
+import {
+  changePasswordBodySchema,
+  loginBodySchema,
+  registerBodySchema,
+  resetPasswordBodySchema,
+} from "../validators/auth.schema";
 
 const router = Router();
 
@@ -13,6 +20,7 @@ const router = Router();
  */
 router.post(
   "/register",
+  validateBody(registerBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const db = await getDatabase();
@@ -41,6 +49,7 @@ router.post(
  */
 router.post(
   "/login",
+  validateBody(loginBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const db = await getDatabase();
@@ -126,6 +135,7 @@ router.post(
 router.post(
   "/change-password",
   requireAuth,
+  validateBody(changePasswordBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const db = await getDatabase();
@@ -154,6 +164,7 @@ router.post(
  */
 router.post(
   "/reset-password",
+  validateBody(resetPasswordBodySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const db = await getDatabase();
