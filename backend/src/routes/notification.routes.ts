@@ -2,6 +2,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../middleware/errorHandler';
+import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { pool } from '../config/database';
 
 const router = Router();
@@ -11,6 +12,8 @@ const router = Router();
  */
 router.get(
   '/',
+  requireAuth,
+  requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.query.userId as string;
@@ -45,6 +48,8 @@ router.get(
  */
 router.post(
   '/mark-read',
+  requireAuth,
+  requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { notificationIds } = req.body;

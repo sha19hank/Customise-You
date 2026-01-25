@@ -18,7 +18,7 @@ CustomiseYou implements multi-layered security across all components.
   "aud": "customiseyou-api",
   "exp": 1700000000,
   "iat": 1699996400,
-  "role": "customer|seller|admin",
+  "role": "user|seller|admin",
   "permissions": ["read:products", "write:cart", "read:orders"]
 }
 ```
@@ -49,7 +49,7 @@ Flow:
 
 ```
 Roles:
-├── customer
+├── user
 │   ├── read:products
 │   ├── write:cart
 │   ├── create:order
@@ -67,6 +67,10 @@ Roles:
     ├── manage:sellers
     ├── manage:disputes
     └── access:analytics
+
+**Implementation Status:**
+- JWT verification and role checks are enforced in `src/middleware/authMiddleware.ts`
+- Protected routes use `requireAuth` + `requireRole`
 ```
 
 ---

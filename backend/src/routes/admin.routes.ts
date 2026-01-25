@@ -2,9 +2,12 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../middleware/errorHandler';
+import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { pool } from '../config/database';
 
 const router = Router();
+
+router.use(requireAuth, requireRole('admin'));
 
 /**
  * GET /admin/sellers - Get all sellers

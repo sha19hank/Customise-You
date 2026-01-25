@@ -2,6 +2,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../middleware/errorHandler';
+import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { pool } from '../config/database';
 
 const router = Router();
@@ -41,6 +42,8 @@ router.get(
  */
 router.post(
   '/',
+  requireAuth,
+  requireRole('seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { productId, type, label, description, isRequired, inputType, priceAdjustment } = req.body;

@@ -3,6 +3,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import ChatService from '../services/chatService';
 import { ValidationError } from '../middleware/errorHandler';
+import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { pool } from '../config/database';
 
 const router = Router();
@@ -13,6 +14,8 @@ const chatService = new ChatService(pool);
  */
 router.get(
   '/',
+  requireAuth,
+  requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.query.userId as string;
@@ -44,6 +47,8 @@ router.get(
  */
 router.get(
   '/:userId',
+  requireAuth,
+  requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userId } = req.params;
@@ -76,6 +81,8 @@ router.get(
  */
 router.post(
   '/',
+  requireAuth,
+  requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { senderId, recipientId, messageType, content, orderId, productId } = req.body;
@@ -109,6 +116,8 @@ router.post(
  */
 router.post(
   '/mark-read',
+  requireAuth,
+  requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userId, otherUserId } = req.body;

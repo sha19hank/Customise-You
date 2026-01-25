@@ -3,6 +3,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import PaymentService from '../services/paymentService';
 import { ValidationError } from '../middleware/errorHandler';
+import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { pool } from '../config/database';
 
 const router = Router();
@@ -13,6 +14,8 @@ const paymentService = new PaymentService(pool);
  */
 router.post(
   '/create-intent',
+  requireAuth,
+  requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { orderId, amount, currency, paymentMethod, paymentMethodId } = req.body;
@@ -44,6 +47,8 @@ router.post(
  */
 router.post(
   '/confirm',
+  requireAuth,
+  requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { orderId, transactionId } = req.body;
@@ -69,6 +74,8 @@ router.post(
  */
 router.get(
   '/status/:orderId',
+  requireAuth,
+  requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { orderId } = req.params;
@@ -94,6 +101,8 @@ router.get(
  */
 router.post(
   '/refund',
+  requireAuth,
+  requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { orderId, amount, reason } = req.body;

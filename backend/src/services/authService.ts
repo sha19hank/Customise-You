@@ -8,7 +8,7 @@ import { Pool } from 'pg';
 export interface AuthPayload {
   userId: string;
   email: string;
-  role: 'customer' | 'seller' | 'admin';
+  role: 'user' | 'seller' | 'admin';
 }
 
 export interface TokenPair {
@@ -61,7 +61,7 @@ class AuthService {
       const tokens = this.generateTokens({
         userId: user.id,
         email: user.email,
-        role: 'customer',
+        role: 'user',
       });
 
       return {
@@ -112,7 +112,7 @@ class AuthService {
       const tokens = this.generateTokens({
         userId: user.id,
         email: user.email,
-        role: 'customer',
+        role: 'user',
       });
 
       // Remove password from response
@@ -166,7 +166,7 @@ class AuthService {
       const tokens = this.generateTokens({
         userId: user.id,
         email: user.email || '',
-        role: 'customer',
+        role: 'user',
       });
 
       return {

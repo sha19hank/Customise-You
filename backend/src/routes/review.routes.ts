@@ -3,6 +3,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import ReviewService from '../services/reviewService';
 import { ValidationError } from '../middleware/errorHandler';
+import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { pool } from '../config/database';
 
 const router = Router();
@@ -13,6 +14,8 @@ const reviewService = new ReviewService(pool);
  */
 router.post(
   '/',
+  requireAuth,
+  requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userId, productId, orderId, rating, title, content, customizationQualityRating, images } = req.body;
@@ -86,6 +89,8 @@ router.get(
  */
 router.post(
   '/:id/helpful',
+  requireAuth,
+  requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

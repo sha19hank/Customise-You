@@ -3,10 +3,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import UserService from '../services/userService';
 import { ValidationError } from '../middleware/errorHandler';
+import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { pool } from '../config/database';
 
 const router = Router();
 const userService = new UserService(pool);
+
+router.use(requireAuth, requireRole('user', 'admin'));
 
 /**
  * GET /users/:id - Get user profile

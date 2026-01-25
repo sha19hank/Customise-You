@@ -3,6 +3,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import OrderService from '../services/orderService';
 import { ValidationError } from '../middleware/errorHandler';
+import { requireAuth, requireRole } from '../middleware/authMiddleware';
 import { pool } from '../config/database';
 
 const router = Router();
@@ -13,6 +14,8 @@ const orderService = new OrderService(pool);
  */
 router.post(
   '/',
+  requireAuth,
+  requireRole('user'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userId, cartItems, shippingAddressId, billingAddressId, shippingMethod, paymentMethod, couponCode } = req.body;
@@ -47,6 +50,8 @@ router.post(
  */
 router.get(
   '/:id',
+  requireAuth,
+  requireRole('user', 'seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -72,6 +77,8 @@ router.get(
  */
 router.get(
   '/user/:userId',
+  requireAuth,
+  requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userId } = req.params;
@@ -99,6 +106,8 @@ router.get(
  */
 router.patch(
   '/:id/status',
+  requireAuth,
+  requireRole('seller', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -126,6 +135,8 @@ router.patch(
  */
 router.post(
   '/:id/cancel',
+  requireAuth,
+  requireRole('user', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

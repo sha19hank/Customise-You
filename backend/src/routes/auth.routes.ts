@@ -3,6 +3,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import AuthService from "../services/authService";
 import { ValidationError } from "../middleware/errorHandler";
+import { requireAuth } from "../middleware/authMiddleware";
 import { pool } from "../config/database";
 
 const router = Router();
@@ -117,6 +118,7 @@ router.post(
  */
 router.post(
   "/change-password",
+  requireAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userId, currentPassword, newPassword } = req.body;
@@ -169,6 +171,7 @@ router.post(
  */
 router.post(
   "/logout",
+  requireAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userId, token } = req.body;
