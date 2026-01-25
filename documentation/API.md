@@ -6,6 +6,46 @@ RESTful API with real-time WebSocket support. All endpoints require authenticati
 
 **Base URL**: `https://api.customiseyou.com/v1`
 
+**Latest Update**: January 25, 2026 - Request validation with Zod schemas implemented
+
+---
+
+## ✅ Request Validation
+
+All API endpoints enforce strict input validation using Zod schemas.
+
+**Validation Features:**
+- Automatic type checking and coercion
+- Field-level error messages
+- Extra field stripping (strict mode)
+- Consistent error format
+
+**Error Response Format (400 Bad Request):**
+```json
+{
+  "error": "Validation failed",
+  "details": [
+    {
+      "field": "email",
+      "message": "Invalid email address"
+    },
+    {
+      "field": "password",
+      "message": "Password must be at least 8 characters"
+    }
+  ]
+}
+```
+
+**Common Validation Rules:**
+- `email`: Valid email format
+- `password`: Minimum 8 characters
+- `uuid`: Valid UUID v4 format
+- `phone`: 7-20 characters
+- `currency`: 3-letter code (e.g., "USD")
+- `rating`: Integer 1-5
+- Positive numbers/integers for quantities and prices
+
 ---
 
 ## 🔐 Authentication

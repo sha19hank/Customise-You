@@ -139,31 +139,70 @@ Security Measures:
 
 ### Input Validation
 
-```javascript
-// Example: Order validation middleware
-const validateOrderRequest = (req, res, next) => {
-  const schema = Joi.object({
-    shipping_address_id: Joi.string().uuid().required(),
-    items: Joi.array().items(
-      Joi.object({
-        product_id: Joi.string().uuid().required(),
-        quantity: Joi.number().integer().min(1).max(100).required(),
-        customizations: Joi.object().required()
-      })
-    ).min(1).required(),
-    payment_method: Joi.string()
-      .valid('credit_card', 'debit_card', 'paypal', 'razorpay')
-      .required()
-  });
+**Implementation: Zod Schema Validation** ✅ (January 25, 2026)
 
-  const { error, value } = schema.validate(req.body);
-  if (error) {
-    return res.status(400).json({ error: error.details });
-  }
-  req.validated = value;
-  next();
-};
+```typescript
+// Request validation using Zod schemas
+import { z } from 'zod';
+import { validateBody } from '../middleware/validate';
+
+// Example: Order creation validation
+const createOrderBodySchema = z.object({
+  userId: z.string().uuid(),
+  cartItems: z.array(z.object({
+    productId: z.string().uuid(),
+    quantity: z.number().int().positive(),
+    customizations: z.record(z.any()).optional().default({})
+  })).min(1, 'At least one cart item is required'),
+  shippingAddressId: z.string().uuid(),
+  billingAddressId: z.string().uuid().optional(),
+  shippingMethod: z.string().min(1).optional(),
+  paymentMethod: z.string().min(1),
+  couponCode: z.string().optional()
+}).strict();
+
+// Apply validation middleware to routes
+router.post('/orders', 
+  requireAuth, 
+  requireRole('user'),
+  validateBody(createOrderBodySchema),
+  createOrderHandler
+);
 ```
+
+**Validation Features:**
+- ✅ Strict schema enforcement (extra fields stripped)
+- ✅ Type-safe validated payloads
+- ✅ Consistent 400 error format with field-level details
+- ✅ Reusable validation middleware (validateBody, validateParams, validateQuery)
+- ✅ Comprehensive schemas for auth, orders, payments
+
+**Error Response Format:**
+```json
+{
+  "error": "Validation failed",
+  "details": [
+    {
+      "field": "email",
+      "message": "Invalid email address"
+    },
+    {
+      "field": "password",
+      "message": "Password must be at least 8 characters"
+    }
+  ]
+}
+```
+
+**Validated Endpoints:**
+- `/auth/register` - User registration
+- `/auth/login` - User login
+- `/auth/change-password` - Password change
+- `/auth/reset-password` - Password reset
+- `/orders` - Order creation
+- `/orders/:id/status` - Order status update
+- `/payments/create-intent` - Payment intent creation
+- `/payments/confirm` - Payment confirmation
 
 ### Rate Limiting
 

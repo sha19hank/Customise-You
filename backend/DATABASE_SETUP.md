@@ -2,6 +2,8 @@
 
 Complete guide to setting up the CustomiseYou PostgreSQL database from scratch.
 
+**Last Updated**: January 25, 2026
+
 ## Quick Start
 
 ```bash
@@ -15,12 +17,31 @@ cp .env.example .env
 # 3. Edit .env with your database credentials
 # (Update DB_PASSWORD at minimum)
 
-# 4. Run migrations
+# 4. Run migrations (applies all 20 migrations)
 npm run migrate
 
-# 5. Verify setup
+# 5. Seed initial data (admin, categories, optional demo)
+npm run db:seed
+# Or with demo products:
+SEED_DEMO=true npm run db:seed
+
+# 6. Verify setup
 npm run migrate:status
 ```
+
+## Migration Summary
+
+**Total Migrations**: 20
+
+**Core Schema (001-017)**:
+- Users, sellers, products, orders, payments
+- Customizations, reviews, chat, notifications
+- Complete e-commerce foundation
+
+**Enhancements (018-020)**:
+- Seller badges and commission tracking
+- Order completion status
+- Seller EXP/level progression with triggers
 
 ## Detailed Setup
 
