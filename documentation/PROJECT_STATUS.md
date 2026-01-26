@@ -1,8 +1,8 @@
 # CustomiseYou Platform - Current Project Status
 
-**Last Updated:** January 25, 2026  
-**Project Status:** Backend API + Database + Auth + Seeding + E2E + Monetization + Validation Complete ✅  
-**Latest Milestone:** Request validation layer with Zod implemented and E2E verified
+**Last Updated:** January 26, 2026  
+**Project Status:** Backend API + Frontend Cart/Checkout + Database + Auth + Seeding Complete ✅  
+**Latest Milestone:** Cart system, checkout flow, and address management implemented with enum fixes
 
 ---
 
@@ -98,6 +98,39 @@
 - [x] All 11 route modules fully implemented (44+ endpoints)
 - [x] JWT auth middleware enforced on protected routes
 - [x] Role-based access checks (user/seller/admin)
+
+### Phase 5: Frontend E-Commerce Flow ✅
+- [x] **Product Details Page**
+  - Fixed backend SQL errors (removed is_active filter)
+  - Fixed field mismatches (quantity_available vs stock_quantity)
+  - Implemented customization selection with validation
+  - Add to Cart functionality with toast notifications
+
+- [x] **Cart System** (`web-app/context/CartContext.tsx`)
+  - React Context with useReducer for state management
+  - localStorage persistence across sessions
+  - Support for product customizations
+  - Calculate totals with customization price adjustments
+  - Cart page with quantity controls and item removal
+
+- [x] **Toast Notification System** (`web-app/context/NotificationContext.tsx`)
+  - Material UI Snackbar replacing blocking alerts
+  - Responsive positioning (bottom-right desktop, bottom-center mobile)
+  - Auto-dismiss with configurable duration
+  - Success/Error/Info/Warning severity levels
+
+- [x] **Checkout Flow - Phase 1** (`web-app/app/checkout/page.tsx`)
+  - Address management (fetch, create, select)
+  - Address type enum: 'Home' | 'Work' | 'Other'
+  - Order summary with cart items and totals
+  - Address selection with radio cards
+  - Add address dialog with full form validation
+  - Payment integration placeholder (ready for Phase 2)
+
+- [x] **Database Schema Updates**
+  - Migration 022: Updated address_type enum from (shipping|billing|both) to (Home|Work|Other)
+  - Proper enum case-sensitivity handling
+  - Existing data migration completed
 
 ### Phase 5: Database Migrations ✅
 - [x] Full PostgreSQL schema migrations created (17 tables + enums + indexes)
@@ -200,6 +233,29 @@
 - Environment not yet configured
 - Ready for setup
 
+### ✅ Web App (Next.js): PARTIALLY COMPLETE
+- Dependencies installed
+- **Context Layer**:
+  - ✅ CartContext: State management with useReducer + localStorage
+  - ✅ NotificationContext: Material UI Snackbar toasts
+  - ✅ AuthContext: JWT authentication
+- **Pages Implemented**:
+  - ✅ Product Details (`/products/[id]`): Customization selection, Add to Cart
+  - ✅ Shopping Cart (`/cart`): Quantity management, proceed to checkout
+  - ✅ Checkout (`/checkout`): Address management, order summary
+- **Services**:
+  - ✅ address.service.ts: Address CRUD operations
+  - ✅ apiClient: Axios with auth interceptors, token refresh
+- **Features**:
+  - ✅ Cart persistence across sessions
+  - ✅ Toast notifications (non-blocking)
+  - ✅ Address type enum: Home | Work | Other (case-sensitive)
+- **Pending**:
+  - Payment integration (Phase 2)
+  - Order creation after payment
+  - Order history page
+  - Seller dashboard integration
+
 ---
 
 ## 📁 Project Structure (Current)
@@ -237,8 +293,22 @@ CustomiseYou/
 │   ├── .eslintrc.json                   ✅
 │   └── node_modules/                    ✅ (installed)
 │
-├── web-app/                             ⏳ PENDING
-│   └── package.json                     (needs: npm install)
+├── web-app/                             ✅ PARTIALLY COMPLETE
+│   ├── package.json                     ✅ (deps installed)
+│   ├── context/
+│   │   ├── CartContext.tsx              ✅
+│   │   ├── NotificationContext.tsx      ✅
+│   │   └── AuthContext.tsx              ✅
+│   ├── services/
+│   │   └── address.service.ts           ✅
+│   ├── types/
+│   │   └── address.ts                   ✅
+│   ├── app/
+│   │   ├── products/[id]/page.tsx       ✅
+│   │   ├── cart/page.tsx                ✅
+│   │   └── checkout/page.tsx            ✅
+│   └── lib/
+│       └── apiClient.ts                 ✅
 │
 ├── mobile-app/                          ⏳ PENDING
 │   └── pubspec.yaml                     (needs: flutter pub get)
@@ -269,22 +339,42 @@ CustomiseYou/
 
 ## 🎯 NEXT IMMEDIATE STEPS (Recommended Order)
 
-### 1. Backend Hardening (Estimated: 1-2 days)
+### 1. Complete Web App Checkout Flow (Estimated: 1-2 days)
+- [ ] **Payment Integration (Phase 2)**
+  - Integrate Razorpay/Stripe payment gateway
+  - Handle payment success/failure callbacks
+  - Create order after successful payment
+  - Update inventory after order creation
+  
+- [ ] **Order Management**
+  - Order history page for users
+  - Order details page with tracking
+  - Order status updates (WebSocket integration)
+  - Cancel order functionality
+
+- [ ] **Testing & Polish**
+  - End-to-end checkout testing
+  - Error handling improvements
+  - Loading states and UX polish
+  - Responsive design verification
+
+### 2. Backend Hardening (Estimated: 1-2 days)
 - [x] ~~Add request validation (Zod)~~ ✅ DONE
 - [x] ~~Create seed data scripts~~ ✅ DONE
+- [x] ~~Fix address_type enum~~ ✅ DONE (Migration 022)
 - [ ] Write unit tests for services
 - [ ] Add integration tests (Supertest)
-- [ ] Extend validation to remaining routes (Tier-2: reviews, products, etc.)
+- [ ] Extend validation to remaining routes
 
-### 2. Setup Web App (Next.js) (Estimated: 2-3 days)
-- [ ] Install dependencies: `cd web-app && npm install`
-- [ ] Create page structure
-- [ ] Setup Redux store
-- [ ] Create API service layer
-- [ ] Implement authentication flow
-- [ ] Create UI components (Material-UI)
+### 3. Seller Dashboard (Estimated: 3-5 days)
+- [ ] Install dependencies
+- [ ] Product management (CRUD)
+- [ ] Order management (view, update status)
+- [ ] Analytics dashboard
+- [ ] Earnings & payouts tracking
+- [ ] Profile & KYC management
 
-### 3. Setup Mobile App (Flutter) (Estimated: 3-5 days)
+### 4. Setup Mobile App (Flutter) (Estimated: 3-5 days)
 - [ ] Configure Flutter SDK
 - [ ] Run: `cd mobile-app && flutter pub get`
 - [ ] Setup project structure

@@ -480,13 +480,15 @@ CREATE TABLE messages (
 ### 11. Addresses
 
 ```sql
+CREATE TYPE address_type AS ENUM ('Home', 'Work', 'Other');
+
 CREATE TABLE addresses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     
     -- Address Details
-    type ENUM('shipping', 'billing', 'both') DEFAULT 'shipping',
-    label VARCHAR(100), -- 'Home', 'Work', 'Other'
+    type address_type DEFAULT 'Home', -- UPDATED: Migration 022 changed from (shipping|billing|both)
+    label VARCHAR(100), -- Optional custom label
     
     -- Address Components
     full_name VARCHAR(255) NOT NULL,
@@ -511,6 +513,9 @@ CREATE TABLE addresses (
     INDEX idx_user_id,
     INDEX idx_is_default
 );
+
+-- Note: address_type enum values are case-sensitive
+-- Frontend must send exactly: 'Home', 'Work', or 'Other'
 ```
 
 ---
