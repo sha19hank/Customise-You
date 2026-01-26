@@ -34,6 +34,8 @@ import VerifiedIcon from '@mui/icons-material/Verified';
 import { productService } from '@/services/product.service';
 import { customizationService } from '@/services/customization.service';
 import { reviewService } from '@/services/review.service';
+import { useCart } from '@/context/CartContext';
+import { useNotification } from '@/context/NotificationContext';
 import { Product } from '@/types/product';
 import { CustomizationOption, CustomizationSelection, ReviewListResponse } from '@/types/customization';
 
@@ -41,12 +43,15 @@ export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
   const productId = params.id as string;
+  const { addItem, getItemKey } = useCart();
+  const { showToast } = useNotification();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [customizations, setCustomizations] = useState<CustomizationOption[]>([]);
   const [reviews, setReviews] = useState<ReviewListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [addingToCart, setAddingToCart] = useState(false);
   
   // Customization state
   const [selectedCustomizations, setSelectedCustomizations] = useState<CustomizationSelection>({});
@@ -80,7 +85,7 @@ export default function ProductDetailPage() {
 
         try {
           const reviewsData = await reviewService.getProductReviews(productId, 1, 5);
-          console.log('[Product Detail] Reviews loaded:', reviewsData?.meta?.totalReviews || 0);
+          console.log('[Product Detail] Reviews loaded:', reviewsData?.meta?.total || 0);
           setReviews(reviewsData);
         } catch (reviewErr) {
           console.warn('[Product Detail] Failed to load reviews:', reviewErr);
@@ -330,11 +335,11 @@ export default function ProductDetailPage() {
           </Typography>
 
           {/* Rating */}
-          {reviews?.meta && reviews.meta.totalReviews > 0 && (
+          {reviews?.meta && reviews.meta.total > 0 && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
               <Rating value={reviews.meta.averageRating} precision={0.1} readOnly />
               <Typography variant="body2" color="text.secondary">
-                {reviews.meta.averageRating.toFixed(1)} ({reviews.meta.totalReviews} reviews)
+                {reviews.meta.averageRating.toFixed(1)} ({reviews.meta.total} reviews)
               </Typography>
             </Box>
           )}
@@ -440,16 +445,49 @@ export default function ProductDetailPage() {
             variant="contained"
             size="large"
             fullWidth
-            disabled={product.status !== 'active' || stockQuantity === 0}
+            disabled={product.status !== 'active' || stockQuantity === 0 || addingToCart}
             onClick={() => {
-              const customizationSummary = Object.values(selectedCustomizations)
-                .map(c => `${c.label}: ${c.value}`)
-                .join('\n');
-              alert(`Cart feature coming soon!\n\nSelected customizations:\n${customizationSummary || 'None'}`);
+              setAddingToCart(true);
+              
+              // Validate required customizations
+              const requiredCustomizations = customizations.filter(c => c.is_required);
+              const missingRequired = requiredCustomizations.filter(
+                rc => !selectedCustomizations[rc.id]?.value
+              );
+
+              if (missingRequired.length > 0) {
+                const missingNames = missingRequired.map(c => c.label).join(', ');
+                showToast(`Please complete required customizations: ${missingNames}`, 'error');
+                setAddingToCart(false);
+                return;
+              }
+
+              // Prepare cart item
+              const cartCustomizations = Object.values(selectedCustomizations)
+                .filter(c => c.value)
+                .map(c => ({
+                  customizationId: c.customizationId,
+                  label: c.label,
+                  value: String(c.value), // Convert to string for cart
+                  priceAdjustment: c.priceAdjustment,
+                }));
+              
+              addItem({
+                productId: product.id,
+                name: product.name,
+                price: totalPrice,
+                quantity: 1,
+                selectedCustomizations: cartCustomizations,
+                productImage: imageUrl,
+              });
+
+              // Show success toast
+              showToast('Product added to cart!', 'success');
+              setAddingToCart(false);
             }}
             sx={{ mb: 2 }}
           >
-            {stockQuantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+            {addingToCart ? 'Adding...' : stockQuantity === 0 ? 'Out of Stock' : 'Add to Cart'}
           </Button>
 
           {product.is_customizable && customizations.length === 0 && (
@@ -488,7 +526,7 @@ export default function ProductDetailPage() {
       )}
 
       {/* Reviews Section */}
-      {reviews && reviews.meta.totalReviews > 0 && (
+      {reviews && reviews.meta.total > 0 && (
         <Box sx={{ mt: 6 }}>
           <Typography variant="h4" gutterBottom>
             Customer Reviews
@@ -504,7 +542,7 @@ export default function ProductDetailPage() {
                   </Typography>
                   <Rating value={reviews.meta.averageRating} precision={0.1} readOnly size="large" />
                   <Typography variant="body2" color="text.secondary">
-                    Based on {reviews.meta.totalReviews} reviews
+                    Based on {reviews.meta.total} reviews
                   </Typography>
                 </Box>
               </Grid>
@@ -516,7 +554,7 @@ export default function ProductDetailPage() {
                     </Typography>
                     <LinearProgress
                       variant="determinate"
-                      value={(reviews.meta.ratingDistribution[rating as keyof typeof reviews.meta.ratingDistribution] / reviews.meta.totalReviews) * 100}
+                      value={(reviews.meta.ratingDistribution[rating as keyof typeof reviews.meta.ratingDistribution] / reviews.meta.total) * 100}
                       sx={{ flex: 1, height: 8, borderRadius: 1 }}
                     />
                     <Typography variant="body2" sx={{ minWidth: 40 }}>

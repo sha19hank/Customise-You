@@ -20,7 +20,7 @@ export interface AddressRequest {
   postalCode: string;
   country: string;
   isDefault?: boolean;
-  addressType: 'shipping' | 'billing' | 'both';
+  addressType: 'Home' | 'Work' | 'Other';
   label?: string;
 }
 
@@ -161,7 +161,7 @@ class UserService {
             addressData.fullName,
             addressData.phoneNumber,
             addressData.label || 'Primary',
-            addressData.addressType,
+            addressData.addressType, // PostgreSQL enum is case-sensitive - pass through exactly as received
             addressData.addressLine1,
             addressData.addressLine2,
             addressData.city,

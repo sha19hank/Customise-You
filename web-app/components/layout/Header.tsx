@@ -8,12 +8,19 @@ import {
   Button,
   Container,
   Box,
+  IconButton,
+  Badge,
 } from '@mui/material';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { useAuth } from '@/context/AuthContext';
+import { useCart } from '@/context/CartContext';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function Header() {
   const { isAuthenticated, user, logout } = useAuth();
+  const { state } = useCart();
+  const router = useRouter();
 
   return (
     <AppBar position="static" elevation={1}>
@@ -33,7 +40,18 @@ export default function Header() {
             CustomiseYou
           </Typography>
 
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            {/* Cart Icon */}
+            <IconButton
+              color="inherit"
+              onClick={() => router.push('/cart')}
+              aria-label="shopping cart"
+            >
+              <Badge badgeContent={state.totalItems} color="error">
+                <ShoppingCartIcon />
+              </Badge>
+            </IconButton>
+
             {isAuthenticated ? (
               <>
                 <Typography

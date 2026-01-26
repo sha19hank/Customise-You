@@ -5,6 +5,8 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { theme } from '@/theme/theme';
 import { AuthProvider } from '@/context/AuthContext';
+import { CartProvider } from '@/context/CartContext';
+import { NotificationProvider } from '@/context/NotificationContext';
 import Header from '@/components/layout/Header';
 
 export const metadata: Metadata = {
@@ -23,10 +25,14 @@ export default function RootLayout({
         <AppRouterCacheProvider>
           <ThemeProvider theme={theme}>
             <CssBaseline />
-            <AuthProvider>
-              <Header />
-              <main>{children}</main>
-            </AuthProvider>
+            <NotificationProvider>
+              <AuthProvider>
+                <CartProvider>
+                  <Header />
+                  <main>{children}</main>
+                </CartProvider>
+              </AuthProvider>
+            </NotificationProvider>
           </ThemeProvider>
         </AppRouterCacheProvider>
       </body>
