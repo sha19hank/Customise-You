@@ -24,9 +24,15 @@ dotenv.config();
 // Create Express app
 const app = express();
 const httpServer = http.createServer(app);
+
+// Socket.IO CORS configuration - matches Express CORS
+const allowedSocketOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+  : ['http://localhost:3001'];
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: allowedSocketOrigins,
     credentials: true,
   },
 });
@@ -50,9 +56,32 @@ const logger = Winston.createLogger({
 
 // Security middleware
 app.use(helmet());
+
+// CORS Configuration - Dynamic origin validation
+// Supports multiple origins but returns only ONE per request (fixes CORS error)
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+  : ['http://localhost:3001'];
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  credentials: true,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (Postman, server-to-server, mobile apps)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // Check if the origin is in the allowlist
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Reject origins not in the allowlist
+    const errorMessage = `CORS policy: Origin ${origin} is not allowed. Allowed origins: ${allowedOrigins.join(', ')}`;
+    callback(new Error(errorMessage));
+  },
+  credentials: true, // Allow cookies and Authorization headers
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
 
 // Compression middleware

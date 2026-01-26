@@ -162,7 +162,7 @@ class ProductService {
       // Get customization options
       const customizationsResult = await this.db.query(
         `SELECT * FROM customizations 
-         WHERE product_id = $1 AND is_active = true
+         WHERE product_id = $1
          ORDER BY display_order ASC`,
         [productId]
       );

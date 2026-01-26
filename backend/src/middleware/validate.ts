@@ -15,11 +15,19 @@ const formatZodError = (error: ZodError): ValidationDetail[] =>
     message: issue.message,
   }));
 
-const sendValidationError = (res: Response, error: ZodError) =>
-  res.status(400).json({
-    error: 'Validation failed',
-    details: formatZodError(error),
+const sendValidationError = (res: Response, error: ZodError) => {
+  const details = formatZodError(error);
+  const fieldErrors = details.map(d => `${d.field}: ${d.message}`).join(', ');
+  
+  return res.status(400).json({
+    success: false,
+    error: {
+      code: 'VALIDATION_ERROR',
+      message: `Validation failed: ${fieldErrors}`,
+      details: details,
+    },
   });
+};
 
 export const validateBody = <TSchema extends ZodTypeAny>(schema: TSchema) =>
   (req: Request, res: Response, next: NextFunction) => {

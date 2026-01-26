@@ -40,7 +40,10 @@ class AuthService {
       );
 
       if (userExists.rows.length > 0) {
-        throw new Error('User with this email already exists');
+        const error: any = new Error('Email already registered');
+        error.status = 409;
+        error.code = 'CONFLICT';
+        throw error;
       }
 
       // Hash password
