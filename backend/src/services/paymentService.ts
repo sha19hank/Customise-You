@@ -28,6 +28,20 @@ class PaymentService {
    */
   async createPaymentIntent(paymentData: CreatePaymentRequest) {
     try {
+      // ============================================================
+      // LEGAL COMPLIANCE: PREPAID-ONLY PAYMENT ENFORCEMENT
+      // ============================================================
+      // Cash on Delivery (COD) is NOT supported yet
+      // All orders must be prepaid via platform payment gateway
+      // This is a safety guard to ensure legal and financial compliance
+      if (paymentData.paymentMethod === 'cod') {
+        throw new Error(
+          'Cash on Delivery (COD) is not supported at this time. ' +
+          'Please use a prepaid payment method (Stripe, Razorpay, or PayPal).'
+        );
+      }
+      // ============================================================
+
       // Get order details
       const orderResult = await this.db.query(
         'SELECT * FROM orders WHERE id = $1',

@@ -31,7 +31,7 @@ class AuthService {
   /**
    * Register a new user
    */
-  async register(email: string, phone: string | null, password: string, firstName: string, lastName: string) {
+  async register(email: string, phone: string | null, password: string, firstName: string, lastName: string, acceptedTerms: boolean = false) {
     try {
       // Validate email doesn't exist
       const userExists = await this.db.query(
@@ -46,13 +46,15 @@ class AuthService {
       // Hash password
       const hashedPassword = await bcryptjs.hash(password, 12);
 
-      // Create user
+      // Create user with optional terms acceptance timestamp
       const userId = uuidv4();
+      const acceptedTermsAt = acceptedTerms ? new Date() : null; // Record timestamp if terms accepted
+      
       const result = await this.db.query(
-        `INSERT INTO users (id, email, phone, first_name, last_name, password_hash, status, registration_source)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO users (id, email, phone, first_name, last_name, password_hash, status, registration_source, accepted_user_terms_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id, email, first_name, last_name, phone, role`,
-        [userId, email, phone, firstName, lastName, hashedPassword, 'active', 'mobile_app']
+        [userId, email, phone, firstName, lastName, hashedPassword, 'active', 'mobile_app', acceptedTermsAt]
       );
 
       const user = result.rows[0];
@@ -342,6 +344,34 @@ class AuthService {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Logout failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * HELPER: Record seller terms acceptance
+   * 
+   * Call this when a user upgrades to seller or during seller onboarding.
+   * This records the timestamp when seller accepted platform terms.
+   * 
+   * Example usage:
+   * ```
+   * await authService.recordSellerTermsAcceptance(sellerId);
+   * ```
+   * 
+   * Legal compliance: Stores only timestamp, not full legal text.
+   */
+  async recordSellerTermsAcceptance(sellerId: string) {
+    try {
+      await this.db.query(
+        `UPDATE sellers 
+         SET accepted_seller_terms_at = NOW() 
+         WHERE id = $1 AND accepted_seller_terms_at IS NULL`,
+        [sellerId]
+      );
+      return { success: true, message: 'Seller terms acceptance recorded' };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to record seller terms acceptance: ${errorMessage}`);
     }
   }
 }
