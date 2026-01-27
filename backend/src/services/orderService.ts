@@ -142,6 +142,8 @@ class OrderService {
       for (const item of itemsToCreate) {
         const itemId = uuidv4();
         
+        // Order items always start as 'pending' regardless of order status
+        // Valid order_item_status values: pending, processing, shipped, delivered, cancelled
         await client.query(
           `INSERT INTO order_items (
             id, order_id, product_id, quantity, unit_price, subtotal, item_status
@@ -153,7 +155,7 @@ class OrderService {
             item.quantity,
             item.unitPrice,
             item.subtotal,
-            orderStatus,
+            'pending',
           ]
         );
 
@@ -385,6 +387,135 @@ class OrderService {
   }
 
   /**
+   * Cancel order (only pending orders)
+   * Restores inventory for all items
+   */
+  async cancelOrder(orderId: string, userId: string) {
+    const client = await this.db.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Get order details
+      const orderResult = await client.query(
+        'SELECT * FROM orders WHERE id = $1 AND user_id = $2',
+        [orderId, userId]
+      );
+
+      if (orderResult.rows.length === 0) {
+        throw new Error('Order not found or unauthorized');
+      }
+
+      const order = orderResult.rows[0];
+
+      // Only allow cancellation of pending orders
+      if (order.status !== 'pending') {
+        throw new Error(`Cannot cancel order with status: ${order.status}`);
+      }
+
+      // Get order items to restore inventory
+      const itemsResult = await client.query(
+        'SELECT product_id, quantity FROM order_items WHERE order_id = $1',
+        [orderId]
+      );
+
+      // Restore inventory for each item
+      for (const item of itemsResult.rows) {
+        await client.query(
+          'UPDATE products SET quantity_available = quantity_available + $1 WHERE id = $2',
+          [item.quantity, item.product_id]
+        );
+      }
+
+      // Update order status
+      const updateResult = await client.query(
+        'UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+        ['cancelled', orderId]
+      );
+
+      // Update order items status
+      await client.query(
+        'UPDATE order_items SET item_status = $1 WHERE order_id = $2',
+        ['cancelled', orderId]
+      );
+
+      await client.query('COMMIT');
+
+      return {
+        id: updateResult.rows[0].id,
+        orderNumber: updateResult.rows[0].order_number,
+        status: updateResult.rows[0].status,
+        message: 'Order cancelled successfully',
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Mark expired orders and restore inventory
+   * Called by background job
+   */
+  async expireOrders(expiryMinutes: number = 30) {
+    const client = await this.db.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Find expired pending orders
+      const expiredResult = await client.query(
+        `SELECT id FROM orders 
+         WHERE status = 'pending' 
+         AND payment_method = 'online'
+         AND created_at < NOW() - INTERVAL '${expiryMinutes} minutes'`
+      );
+
+      const expiredCount = expiredResult.rows.length;
+
+      for (const order of expiredResult.rows) {
+        // Get order items to restore inventory
+        const itemsResult = await client.query(
+          'SELECT product_id, quantity FROM order_items WHERE order_id = $1',
+          [order.id]
+        );
+
+        // Restore inventory
+        for (const item of itemsResult.rows) {
+          await client.query(
+            'UPDATE products SET quantity_available = quantity_available + $1 WHERE id = $2',
+            [item.quantity, item.product_id]
+          );
+        }
+
+        // Mark order as expired
+        await client.query(
+          'UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2',
+          ['expired', order.id]
+        );
+
+        // Update order items
+        await client.query(
+          'UPDATE order_items SET item_status = $1 WHERE order_id = $2',
+          ['expired', order.id]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      return {
+        expiredCount,
+        message: `${expiredCount} order(s) expired and inventory restored`,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Get order details
    */
   async getOrderDetails(orderId: string) {
@@ -431,10 +562,22 @@ class OrderService {
         [order.shipping_address_id]
       );
 
+      // Calculate lifecycle metadata
+      const EXPIRY_MINUTES = 30;
+      const canCancel = order.status === 'pending';
+      
+      let expiresAt = null;
+      if (order.status === 'pending' && order.payment_method === 'online') {
+        const createdAt = new Date(order.created_at);
+        expiresAt = new Date(createdAt.getTime() + EXPIRY_MINUTES * 60 * 1000);
+      }
+
       return {
         ...order,
         items,
         shipping_address: addressResult.rows[0] || null,
+        can_cancel: canCancel,
+        expires_at: expiresAt,
         timeline: [
           { status: 'pending', timestamp: order.created_at },
           ...(order.confirmed_at ? [{ status: 'confirmed', timestamp: order.confirmed_at }] : []),
@@ -521,67 +664,7 @@ class OrderService {
       throw new Error(`Failed to fetch seller orders: ${errorMessage}`);
     }
   }
-
-  /**
-   * Cancel order
-   */
-  async cancelOrder(orderId: string, reason: string) {
-    const client = await this.db.connect();
-    try {
-      await client.query('BEGIN');
-
-      // Get order
-      const orderResult = await client.query(
-        'SELECT * FROM orders WHERE id = $1',
-        [orderId]
-      );
-
-      if (orderResult.rows.length === 0) {
-        throw new Error('Order not found');
-      }
-
-      const order = orderResult.rows[0];
-
-      // Can only cancel pending orders
-      if (order.status !== 'pending' && order.status !== 'confirmed') {
-        throw new Error(`Cannot cancel order with status: ${order.status}`);
-      }
-
-      // Update order status
-      await client.query(
-        'UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2',
-        ['cancelled', orderId]
-      );
-
-      // Restore inventory
-      const itemsResult = await client.query(
-        'SELECT product_id, quantity FROM order_items WHERE order_id = $1',
-        [orderId]
-      );
-
-      for (const item of itemsResult.rows) {
-        await client.query(
-          'UPDATE products SET quantity_available = quantity_available + $1 WHERE id = $2',
-          [item.quantity, item.product_id]
-        );
-      }
-
-      await client.query('COMMIT');
-
-      return {
-        success: true,
-        message: 'Order cancelled successfully',
-        refundInitiated: true,
-        estimatedRefundDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days
-      };
-    } catch (error: unknown) {
-      await client.query('ROLLBACK');
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to cancel order: ${errorMessage}`);
-    } finally {
-      client.release();
-    }
-  }
 }
 
 export default OrderService;
+

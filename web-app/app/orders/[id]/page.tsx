@@ -18,8 +18,13 @@ import {
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import CancelIcon from '@mui/icons-material/Cancel';
+import TimerIcon from '@mui/icons-material/Timer';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import PaymentIcon from '@mui/icons-material/Payment';
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
+import apiClient from '@/services/api';
 
 interface OrderItem {
   id: string;
@@ -46,6 +51,8 @@ interface Order {
   payment_method: string;
   payment_status: string;
   created_at: string;
+  can_cancel: boolean;
+  expires_at: string | null;
   shipping_address: {
     full_name: string;
     phone_number: string;
@@ -69,6 +76,8 @@ export default function OrderDetailsPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<string>('');
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -80,25 +89,86 @@ export default function OrderDetailsPage() {
     fetchOrderDetails();
   }, [isAuthenticated, orderId]);
 
+  // Countdown timer for order expiry
+  useEffect(() => {
+    if (!order?.expires_at) return;
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      const expiresAt = new Date(order.expires_at!);
+      const diff = expiresAt.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setTimeRemaining('Expired');
+        clearInterval(interval);
+        // Refresh order to get updated status
+        fetchOrderDetails();
+      } else {
+        const minutes = Math.floor(diff / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        setTimeRemaining(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [order?.expires_at]);
+
   const fetchOrderDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/v1/orders/${orderId}`, {
-        credentials: 'include',
-      });
+      const response = await apiClient.get(`/orders/${orderId}`);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch order details');
+      if (!response.data || !response.data.data) {
+        console.error('[Order Details] Invalid API response:', response.data);
+        throw new Error('Invalid server response');
       }
 
-      const result = await response.json();
-      setOrder(result.data); // Extract data from API response
+      setOrder(response.data.data);
     } catch (err: any) {
-      console.error('Error fetching order:', err);
-      setError('Failed to load order details. Please try again.');
-      showToast('Failed to load order details', 'error');
+      console.error('[Order Details] Error fetching order:', err);
+      
+      let errorMessage = 'Failed to load order details. Please try again.';
+      if (err.response) {
+        errorMessage = err.response.data?.error?.message || err.response.data?.message || errorMessage;
+      } else if (err.request) {
+        errorMessage = 'Backend API not reachable. Please ensure the server is running.';
+      }
+      
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!order || !user?.id) return;
+
+    if (!confirm('Are you sure you want to cancel this order?')) {
+      return;
+    }
+
+    try {
+      setCancelling(true);
+      await apiClient.post(`/orders/${orderId}/cancel`, {
+        userId: user.id,
+      });
+
+      showToast('Order cancelled successfully', 'success');
+      fetchOrderDetails(); // Refresh order details
+    } catch (err: any) {
+      console.error('[Order Details] Error cancelling order:', err);
+      
+      let errorMessage = 'Failed to cancel order';
+      if (err.response) {
+        errorMessage = err.response.data?.error?.message || err.response.data?.message || errorMessage;
+      } else if (err.request) {
+        errorMessage = 'Backend API not reachable';
+      }
+      
+      showToast(errorMessage, 'error');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -111,6 +181,7 @@ export default function OrderDetailsPage() {
       case 'processing':
         return 'warning';
       case 'cancelled':
+      case 'expired':
         return 'error';
       default:
         return 'default';
@@ -142,20 +213,88 @@ export default function OrderDetailsPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Success Header */}
-      <Paper sx={{ p: 4, mb: 3, textAlign: 'center', bgcolor: 'success.light' }}>
-        <CheckCircleIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
-        <Typography variant="h4" gutterBottom>
-          Order Placed Successfully!
-        </Typography>
-        <Typography variant="h6" color="text.secondary" gutterBottom>
-          Order #{order.order_number}
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          {order.payment_method === 'cod' 
-            ? 'Your order has been confirmed. You can pay on delivery.'
-            : 'Your order is pending payment confirmation.'}
-        </Typography>
+      {/* Success/Status Header */}
+      <Paper 
+        sx={{ 
+          p: 4, 
+          mb: 3, 
+          textAlign: 'center', 
+          bgcolor: order.status === 'cancelled' || order.status === 'expired' 
+            ? 'error.light' 
+            : order.status === 'pending' 
+              ? 'warning.light' 
+              : 'success.light' 
+        }}
+      >
+        {order.status === 'cancelled' ? (
+          <>
+            <CancelIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
+            <Typography variant="h4" gutterBottom>
+              Order Cancelled
+            </Typography>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Order #{order.order_number}
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              This order has been cancelled. The amount will be refunded if already paid.
+            </Typography>
+          </>
+        ) : order.status === 'expired' ? (
+          <>
+            <ErrorOutlineIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
+            <Typography variant="h4" gutterBottom>
+              Order Expired
+            </Typography>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Order #{order.order_number}
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+              This order expired due to non-payment. The items have been returned to inventory.
+            </Typography>
+            <Button 
+              variant="contained" 
+              onClick={() => router.push('/')}
+              sx={{ mt: 1 }}
+            >
+              Continue Shopping
+            </Button>
+          </>
+        ) : order.status === 'pending' ? (
+          <>
+            <TimerIcon sx={{ fontSize: 64, color: 'warning.main', mb: 2 }} />
+            <Typography variant="h4" gutterBottom>
+              Order Pending Payment
+            </Typography>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Order #{order.order_number}
+            </Typography>
+            {order.expires_at && (
+              <Alert severity="warning" sx={{ mt: 2, display: 'inline-flex' }}>
+                <Typography variant="body1" fontWeight="bold">
+                  Time Remaining: {timeRemaining}
+                </Typography>
+              </Alert>
+            )}
+            <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
+              Please complete payment to confirm your order.
+            </Typography>
+          </>
+        ) : (
+          <>
+            <CheckCircleIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
+            <Typography variant="h4" gutterBottom>
+              Order Placed Successfully!
+            </Typography>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Order #{order.order_number}
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              {order.payment_method === 'cod' 
+                ? 'Your order has been confirmed. You can pay on delivery.'
+                : 'Your order is confirmed and being processed.'}
+            </Typography>
+          </>
+        )}
       </Paper>
 
       <Grid container spacing={3}>
@@ -304,10 +443,38 @@ export default function OrderDetailsPage() {
               </Typography>
             </Box>
 
+            {/* Action Buttons */}
+            {order.can_cancel && order.status === 'pending' && (
+              <Button
+                variant="outlined"
+                color="error"
+                fullWidth
+                startIcon={<CancelIcon />}
+                onClick={handleCancelOrder}
+                disabled={cancelling}
+                sx={{ mb: 2 }}
+              >
+                {cancelling ? 'Cancelling...' : 'Cancel Order'}
+              </Button>
+            )}
+
+            {order.status === 'pending' && order.payment_method === 'online' && timeRemaining !== 'Expired' && (
+              <Button
+                variant="contained"
+                fullWidth
+                startIcon={<PaymentIcon />}
+                onClick={() => router.push(`/orders/${orderId}/payment`)}
+                sx={{ mb: 2 }}
+              >
+                Complete Payment
+              </Button>
+            )}
+
             <Button
               variant="contained"
               fullWidth
               onClick={() => router.push('/')}
+              disabled={order.status === 'pending' && timeRemaining !== 'Expired'}
             >
               Continue Shopping
             </Button>

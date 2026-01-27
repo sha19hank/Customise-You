@@ -19,6 +19,7 @@ import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
+import apiClient from '@/services/api';
 
 interface OrderSummary {
   id: string;
@@ -55,20 +56,26 @@ export default function OrdersPage() {
 
     try {
       setLoading(true);
-      const response = await fetch(`/api/v1/orders/user/${user.id}`, {
-        credentials: 'include',
-      });
+      const response = await apiClient.get(`/orders/user/${user.id}`);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch orders');
+      if (!response.data || !response.data.data) {
+        console.error('[Orders List] Invalid API response:', response.data);
+        throw new Error('Invalid server response');
       }
 
-      const result = await response.json();
-      setOrders(result.data.orders || []);
+      setOrders(response.data.data.orders || []);
     } catch (err: any) {
-      console.error('Error fetching orders:', err);
-      setError('Failed to load orders. Please try again.');
-      showToast('Failed to load orders', 'error');
+      console.error('[Orders List] Error fetching orders:', err);
+      
+      let errorMessage = 'Failed to load orders. Please try again.';
+      if (err.response) {
+        errorMessage = err.response.data?.error?.message || err.response.data?.message || errorMessage;
+      } else if (err.request) {
+        errorMessage = 'Backend API not reachable. Please ensure the server is running.';
+      }
+      
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
       setLoading(false);
     }

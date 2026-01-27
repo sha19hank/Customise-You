@@ -125,6 +125,41 @@ router.get(
 );
 
 /**
+ * POST /orders/:id/cancel - Cancel order
+ */
+router.post(
+  '/:id/cancel',
+  requireAuth,
+  requireRole('user'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const db = await getDatabase();
+      const orderService = new OrderService(db);
+      const { id } = req.params;
+      const userId = req.body.userId || (req as any).user?.id;
+
+      if (!id) {
+        throw new ValidationError('Order ID is required');
+      }
+
+      if (!userId) {
+        throw new ValidationError('User ID is required');
+      }
+
+      const result = await orderService.cancelOrder(id, userId);
+
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * GET /orders/user/:userId - Get user's orders
  */
 router.get(
@@ -212,6 +247,32 @@ router.post(
         success: true,
         message: 'Order cancelled successfully',
         data: order,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /orders/expire - Mark expired orders (background job endpoint)
+ */
+router.post(
+  '/expire',
+  requireAuth,
+  requireRole('admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const db = await getDatabase();
+      const orderService = new OrderService(db);
+      const expiryMinutes = parseInt(req.body.expiryMinutes) || 30;
+
+      const result = await orderService.expireOrders(expiryMinutes);
+
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result,
       });
     } catch (error) {
       next(error);

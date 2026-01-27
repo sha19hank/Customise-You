@@ -39,11 +39,12 @@ import { useCart } from '@/context/CartContext';
 import { useNotification } from '@/context/NotificationContext';
 import { addressService } from '@/services/address.service';
 import { Address, AddressFormData, AddressType, ADDRESS_TYPE_LABELS } from '@/types/address';
+import apiClient from '@/services/api';
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const { state: cartState } = useCart();
+  const { state: cartState, clearCart } = useCart();
   const { showToast } = useNotification();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -181,43 +182,58 @@ export default function CheckoutPage() {
         })),
       }));
 
-      // Create order intent
-      const response = await fetch('/api/v1/orders/intent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          userId: user.id,
-          cartItems,
-          addressId: selectedAddressId,
-          paymentMethod,
-        }),
+      // Create order intent using apiClient (correct backend URL)
+      const response = await apiClient.post('/orders/intent', {
+        userId: user.id,
+        cartItems,
+        addressId: selectedAddressId,
+        paymentMethod,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to create order');
+      // Defensive response validation
+      if (!response.data || !response.data.data) {
+        console.error('[Checkout] Invalid API response:', response.data);
+        throw new Error('Invalid server response. Please try again.');
       }
 
-      const result = await response.json();
-      const data = result.data; // Extract data from API response
+      const { orderId } = response.data.data;
+
+      if (!orderId) {
+        console.error('[Checkout] Missing orderId in response:', response.data);
+        throw new Error('Order creation failed. Please contact support.');
+      }
 
       // Clear cart on successful order creation
-      localStorage.removeItem('customiseyou-cart');
+      clearCart();
 
       // Redirect based on payment method
       if (paymentMethod === 'COD') {
-        showToast('Order placed successfully!', 'success');
-        router.push(`/orders/${data.orderId}`);
+        showToast('Order placed successfully (Cash on Delivery)!', 'success');
+        router.push(`/orders/${orderId}`);
       } else {
         showToast('Redirecting to payment...', 'info');
-        router.push(`/orders/${data.orderId}/payment`);
+        router.push(`/orders/${orderId}/payment`);
       }
     } catch (err: any) {
-      console.error('Error placing order:', err);
-      showToast(err.message || 'Failed to place order. Please try again.', 'error');
+      console.error('[Checkout] Error placing order:', err);
+      
+      // Better error messages
+      let errorMessage = 'Failed to place order. Please try again.';
+      
+      if (err.response) {
+        // Backend returned an error
+        errorMessage = err.response.data?.error?.message || err.response.data?.message || errorMessage;
+        console.error('[Checkout] Backend error:', err.response.status, err.response.data);
+      } else if (err.request) {
+        // No response from backend
+        errorMessage = 'Backend API not reachable. Please ensure the server is running on port 3000.';
+        console.error('[Checkout] No response from backend:', err.request);
+      } else {
+        // Other errors
+        errorMessage = err.message || errorMessage;
+      }
+      
+      showToast(errorMessage, 'error');
     } finally {
       setPlacingOrder(false);
     }

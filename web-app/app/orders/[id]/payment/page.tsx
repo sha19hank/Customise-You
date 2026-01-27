@@ -18,6 +18,7 @@ import PaymentIcon from '@mui/icons-material/Payment';
 import InfoIcon from '@mui/icons-material/Info';
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
+import apiClient from '@/services/api';
 
 interface Order {
   id: string;
@@ -25,6 +26,8 @@ interface Order {
   total_amount: number;
   payment_method: string;
   payment_status: string;
+  status: string;
+  expires_at: string | null;
 }
 
 export default function PaymentPage() {
@@ -37,6 +40,7 @@ export default function PaymentPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [timeRemaining, setTimeRemaining] = useState<string>('');
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -48,28 +52,118 @@ export default function PaymentPage() {
     fetchOrderDetails();
   }, [isAuthenticated, orderId]);
 
+  // Countdown timer
+  useEffect(() => {
+    if (!order?.expires_at) return;
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      const expiresAt = new Date(order.expires_at!);
+      const diff = expiresAt.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        console.log('[Payment Page] Order expired during countdown');
+        setTimeRemaining('Expired');
+        clearInterval(interval);
+        showToast('Order has expired. Redirecting...', 'warning');
+        // Redirect to order details to show expired state
+        setTimeout(() => router.push(`/orders/${orderId}`), 2000);
+      } else {
+        const minutes = Math.floor(diff / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        setTimeRemaining(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+        
+        // Warn user when less than 2 minutes remaining
+        if (diff <= 120000 && diff > 119000) {
+          showToast('Only 2 minutes remaining! Complete payment soon.', 'warning');
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [order?.expires_at]);
+
   const fetchOrderDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/v1/orders/${orderId}`, {
-        credentials: 'include',
+      console.log('[Payment Page] Fetching order details for:', orderId);
+      
+      const response = await apiClient.get(`/orders/${orderId}`);
+
+      // Defensive response validation
+      if (!response.data || !response.data.data) {
+        console.error('[Payment Page] Invalid API response structure:', response.data);
+        throw new Error('Invalid server response. Please try again.');
+      }
+
+      const orderData = response.data.data;
+      console.log('[Payment Page] Order data:', {
+        status: orderData.status,
+        payment_status: orderData.payment_status,
+        expires_at: orderData.expires_at,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch order details');
-      }
+      setOrder(orderData);
 
-      const result = await response.json();
-      const data = result.data; // Extract data from API response
-      setOrder(data);
-
-      // Redirect to order details if already paid
-      if (data.payment_status === 'completed') {
+      // Handle order state - redirect if not payable
+      if (orderData.payment_status === 'completed' || orderData.payment_status === 'paid') {
+        console.log('[Payment Page] Order already paid, redirecting to order details');
+        showToast('This order has already been paid', 'info');
         router.push(`/orders/${orderId}`);
+        return;
       }
+
+      if (orderData.status === 'expired') {
+        console.log('[Payment Page] Order expired, redirecting to order details');
+        showToast('This order has expired. Please create a new order.', 'warning');
+        router.push(`/orders/${orderId}`);
+        return;
+      }
+
+      if (orderData.status === 'cancelled') {
+        console.log('[Payment Page] Order cancelled, redirecting to order details');
+        showToast('This order has been cancelled', 'info');
+        router.push(`/orders/${orderId}`);
+        return;
+      }
+
+      if (orderData.payment_method?.toLowerCase() === 'cod') {
+        console.log('[Payment Page] COD order does not require payment page');
+        showToast('This is a Cash on Delivery order', 'info');
+        router.push(`/orders/${orderId}`);
+        return;
+      }
+
+      console.log('[Payment Page] Order is valid and awaiting payment');
     } catch (err: any) {
-      console.error('Error fetching order:', err);
-      setError('Failed to load payment page. Please try again.');
+      console.error('[Payment Page] Error fetching order:', err);
+      
+      let errorMessage = 'Failed to load payment page. Please try again.';
+      
+      if (err.response) {
+        // Backend returned an error
+        const status = err.response.status;
+        if (status === 404) {
+          errorMessage = 'Order not found. Please check the order ID.';
+        } else if (status === 401 || status === 403) {
+          errorMessage = 'You do not have permission to access this order.';
+          router.push('/login');
+          return;
+        } else {
+          errorMessage = err.response.data?.error?.message || err.response.data?.message || errorMessage;
+        }
+        console.error('[Payment Page] Backend error:', status, err.response.data);
+      } else if (err.request) {
+        // No response from backend
+        errorMessage = 'Backend API not reachable. Please ensure the server is running on port 3000.';
+        console.error('[Payment Page] No response from backend');
+      } else {
+        // Other errors
+        errorMessage = err.message || errorMessage;
+      }
+      
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -110,6 +204,18 @@ export default function PaymentPage() {
           <Typography variant="h6" color="text.secondary">
             Order #{order.order_number}
           </Typography>
+          
+          {/* Expiry Countdown */}
+          {order.expires_at && timeRemaining && timeRemaining !== 'Expired' && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              <Typography variant="body1" fontWeight="bold">
+                Time Remaining: {timeRemaining}
+              </Typography>
+              <Typography variant="caption">
+                Complete payment before expiry to confirm your order
+              </Typography>
+            </Alert>
+          )}
         </Box>
 
         <Divider sx={{ my: 3 }} />
