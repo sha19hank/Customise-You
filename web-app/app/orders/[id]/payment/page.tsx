@@ -1,6 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
+// Razorpay types
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 import { useRouter, useParams } from 'next/navigation';
 import {
   Container,
@@ -41,6 +48,28 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  const [processingPayment, setProcessingPayment] = useState(false);
+
+  // Load Razorpay SDK
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('[Payment Page] Razorpay SDK loaded');
+      setRazorpayLoaded(true);
+    };
+    script.onerror = () => {
+      console.error('[Payment Page] Failed to load Razorpay SDK');
+      showToast('Failed to load payment gateway', 'error');
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -82,6 +111,121 @@ export default function PaymentPage() {
 
     return () => clearInterval(interval);
   }, [order?.expires_at]);
+
+  const handlePayment = async () => {
+    if (!razorpayLoaded) {
+      showToast('Payment gateway is still loading. Please wait...', 'warning');
+      return;
+    }
+
+    if (!order || !user?.id) {
+      showToast('Order or user information missing', 'error');
+      return;
+    }
+
+    try {
+      setProcessingPayment(true);
+      console.log('[Payment Page] Creating Razorpay order...');
+
+      // Create Razorpay order
+      const createResponse = await apiClient.post('/payments/razorpay/create', {
+        orderId: order.id,
+      });
+
+      if (!createResponse.data || !createResponse.data.data) {
+        throw new Error('Invalid response from payment gateway');
+      }
+
+      const { key_id, razorpay_order_id, amount, currency, order_number } = createResponse.data.data;
+
+      console.log('[Payment Page] Razorpay order created:', razorpay_order_id);
+
+      // Get user details for prefill
+      const userEmail = user.email || '';
+      const userName = user.firstName && user.lastName 
+        ? `${user.firstName} ${user.lastName}` 
+        : user.firstName || user.email || '';
+
+      // Razorpay options
+      const options = {
+        key: key_id,
+        amount: amount,
+        currency: currency,
+        name: 'CustomiseYou',
+        description: `Order #${order_number}`,
+        order_id: razorpay_order_id,
+        prefill: {
+          email: userEmail,
+          name: userName,
+        },
+        theme: {
+          color: '#1976d2',
+        },
+        handler: async function (response: any) {
+          try {
+            console.log('[Payment Page] Payment successful, verifying...');
+            console.log('[Payment Page] Razorpay response:', response);
+
+            // Verify payment
+            const verifyResponse = await apiClient.post('/payments/razorpay/verify', {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              orderId: order.id,
+            });
+
+            if (verifyResponse.data.success) {
+              console.log('[Payment Page] Payment verified successfully');
+              showToast('Payment successful! Your order is confirmed.', 'success');
+              router.push(`/orders/${order.id}`);
+            } else {
+              throw new Error('Payment verification failed');
+            }
+          } catch (err: any) {
+            console.error('[Payment Page] Payment verification error:', err);
+            showToast('Payment verification failed. Please contact support.', 'error');
+          } finally {
+            setProcessingPayment(false);
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            console.log('[Payment Page] Payment cancelled by user');
+            setProcessingPayment(false);
+            showToast('Payment cancelled', 'info');
+          },
+        },
+      };
+
+      // Check if Razorpay SDK is loaded
+      if (!window.Razorpay) {
+        throw new Error('Payment gateway not ready. Please refresh the page and try again.');
+      }
+
+      // Open Razorpay checkout
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    } catch (err: any) {
+      console.error('[Payment Page] Payment initiation error:', err);
+      
+      // Enhanced error logging for debugging
+      if (err.response) {
+        console.error('[Payment Page] Full error response:', err.response);
+      }
+
+      let errorMessage = 'Failed to initiate payment';
+      if (err.response) {
+        errorMessage = err.response.data?.error?.message || err.response.data?.message || errorMessage;
+      } else if (err.request) {
+        errorMessage = 'Backend API not reachable';
+      } else {
+        errorMessage = err.message || errorMessage;
+      }
+
+      showToast(errorMessage, 'error');
+      setProcessingPayment(false);
+    }
+  };
 
   const fetchOrderDetails = async () => {
     try {
@@ -234,72 +378,21 @@ export default function PaymentPage() {
           </CardContent>
         </Card>
 
-        {/* Payment Gateway Placeholder */}
-        <Alert severity="info" icon={<InfoIcon />} sx={{ mb: 3 }}>
+        {/* Payment Methods Info */}
+        <Alert severity="success" icon={<InfoIcon />} sx={{ mb: 3 }}>
           <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-            Payment Gateway Integration Coming Soon
+            Secure Payment via Razorpay
           </Typography>
           <Typography variant="body2">
-            We are currently integrating secure payment options including:
+            We accept all major payment methods:
           </Typography>
           <Box component="ul" sx={{ mt: 1, mb: 0 }}>
             <li>UPI (Google Pay, PhonePe, Paytm)</li>
-            <li>Credit/Debit Cards</li>
-            <li>Net Banking</li>
-            <li>Wallets</li>
+            <li>Credit/Debit Cards (Visa, Mastercard, Rupay)</li>
+            <li>Net Banking (All major banks)</li>
+            <li>Wallets (Paytm, PhonePe, Amazon Pay)</li>
           </Box>
         </Alert>
-
-        {/* Placeholder Payment Options */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Payment Options (Demo)
-          </Typography>
-          
-          <Card variant="outlined" sx={{ mb: 2, opacity: 0.6 }}>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight="bold">
-                💳 UPI
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Pay using Google Pay, PhonePe, Paytm, or any UPI app
-              </Typography>
-            </CardContent>
-          </Card>
-
-          <Card variant="outlined" sx={{ mb: 2, opacity: 0.6 }}>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight="bold">
-                💰 Credit/Debit Card
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Visa, Mastercard, Rupay, American Express
-              </Typography>
-            </CardContent>
-          </Card>
-
-          <Card variant="outlined" sx={{ mb: 2, opacity: 0.6 }}>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight="bold">
-                🏦 Net Banking
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                All major banks supported
-              </Typography>
-            </CardContent>
-          </Card>
-
-          <Card variant="outlined" sx={{ opacity: 0.6 }}>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight="bold">
-                👛 Wallets
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Paytm, PhonePe, Amazon Pay, and more
-              </Typography>
-            </CardContent>
-          </Card>
-        </Box>
 
         <Divider sx={{ my: 3 }} />
 
@@ -309,21 +402,38 @@ export default function PaymentPage() {
             variant="outlined"
             fullWidth
             onClick={() => router.push(`/orders/${orderId}`)}
+            disabled={processingPayment}
           >
             View Order Details
           </Button>
           <Button
             variant="contained"
             fullWidth
-            disabled
+            onClick={handlePayment}
+            disabled={!razorpayLoaded || processingPayment || timeRemaining === 'Expired'}
+            startIcon={processingPayment ? <CircularProgress size={20} /> : <PaymentIcon />}
           >
-            Proceed to Payment (Coming Soon)
+            {processingPayment ? 'Processing...' : 'Pay Now'}
           </Button>
         </Box>
 
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
-          Your order has been created and is awaiting payment confirmation.
-        </Typography>
+        {!razorpayLoaded && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
+            Loading payment gateway...
+          </Typography>
+        )}
+
+        {razorpayLoaded && timeRemaining !== 'Expired' && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
+            🔒 Secure payment powered by Razorpay
+          </Typography>
+        )}
+
+        {timeRemaining === 'Expired' && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            This order has expired. Please create a new order.
+          </Alert>
+        )}
       </Paper>
     </Container>
   );

@@ -135,4 +135,97 @@ router.post(
   }
 );
 
+/**
+ * POST /payments/razorpay/create - Create Razorpay order
+ */
+router.post(
+  '/razorpay/create',
+  requireAuth,
+  requireRole('user'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const db = await getDatabase();
+      const paymentService = new PaymentService(db);
+      const { orderId } = req.body;
+
+      if (!orderId) {
+        throw new ValidationError('Order ID is required');
+      }
+
+      const razorpayOrder = await paymentService.createRazorpayOrder(orderId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Razorpay order created successfully',
+        data: razorpayOrder,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /payments/razorpay/verify - Verify Razorpay payment
+ */
+router.post(
+  '/razorpay/verify',
+  requireAuth,
+  requireRole('user'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const db = await getDatabase();
+      const paymentService = new PaymentService(db);
+      const { razorpay_payment_id, razorpay_order_id, razorpay_signature, orderId } = req.body;
+
+      if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !orderId) {
+        throw new ValidationError('Payment ID, Order ID, Signature, and Order ID are required');
+      }
+
+      const result = await paymentService.verifyRazorpayPayment({
+        razorpay_payment_id,
+        razorpay_order_id,
+        razorpay_signature,
+        orderId,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Payment verified successfully',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /payments/razorpay/webhook - Razorpay webhook handler
+ */
+router.post(
+  '/razorpay/webhook',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const db = await getDatabase();
+      const paymentService = new PaymentService(db);
+      const webhookSignature = req.headers['x-razorpay-signature'] as string;
+      const webhookBody = req.body;
+
+      if (!webhookSignature) {
+        throw new ValidationError('Webhook signature is required');
+      }
+
+      await paymentService.handleRazorpayWebhook(webhookBody, webhookSignature);
+
+      res.status(200).json({
+        success: true,
+        message: 'Webhook processed successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

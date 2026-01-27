@@ -402,10 +402,10 @@ export default function CheckoutPage() {
                           Online Payment
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Pay securely online (UPI, Card, Net Banking)
+                          Secure payment via Razorpay (UPI, Cards, Net Banking)
                         </Typography>
-                        <Alert severity="info" sx={{ mt: 1 }}>
-                          Payment gateway integration coming soon
+                        <Alert severity="success" sx={{ mt: 1 }}>
+                          ✓ Razorpay integration enabled
                         </Alert>
                       </Box>
                     }
