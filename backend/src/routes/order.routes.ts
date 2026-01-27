@@ -15,6 +15,48 @@ import {
 const router = Router();
 
 /**
+ * POST /orders/intent - Create order intent (Myntra-style)
+ * Creates order before payment, with status based on payment method
+ */
+router.post(
+  '/intent',
+  requireAuth,
+  requireRole('user'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const db = await getDatabase();
+      const orderService = new OrderService(db);
+      const { userId, cartItems, addressId, paymentMethod } = req.body;
+
+      // Validate required fields
+      if (!userId || !cartItems || cartItems.length === 0 || !addressId || !paymentMethod) {
+        throw new ValidationError('User ID, cart items, address, and payment method are required');
+      }
+
+      // Validate payment method
+      if (!['COD', 'ONLINE'].includes(paymentMethod)) {
+        throw new ValidationError('Payment method must be COD or ONLINE');
+      }
+
+      const orderIntent = await orderService.createOrderIntent({
+        userId,
+        cartItems,
+        addressId,
+        paymentMethod,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Order intent created successfully',
+        data: orderIntent,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /orders - Create new order
  */
 router.post(

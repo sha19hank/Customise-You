@@ -48,10 +48,12 @@ export default function CheckoutPage() {
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'ONLINE'>('COD');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [addAddressOpen, setAddAddressOpen] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
+  const [placingOrder, setPlacingOrder] = useState(false);
 
   // Address form state
   const [addressForm, setAddressForm] = useState<AddressFormData>({
@@ -150,12 +152,75 @@ export default function CheckoutPage() {
     }
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (!selectedAddressId) {
       showToast('Please select a delivery address', 'error');
       return;
     }
-    showToast('Payment integration coming soon!', 'info');
+
+    if (!user?.id) {
+      showToast('Please login to continue', 'error');
+      router.push('/login');
+      return;
+    }
+
+    try {
+      setPlacingOrder(true);
+
+      // Format cart items for backend
+      const cartItems = cartState.items.map(item => ({
+        productId: item.productId,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        customizations: item.selectedCustomizations.map(custom => ({
+          customizationId: custom.customizationId,
+          label: custom.label,
+          value: custom.value,
+          priceAdjustment: custom.priceAdjustment,
+        })),
+      }));
+
+      // Create order intent
+      const response = await fetch('/api/v1/orders/intent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: user.id,
+          cartItems,
+          addressId: selectedAddressId,
+          paymentMethod,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to create order');
+      }
+
+      const result = await response.json();
+      const data = result.data; // Extract data from API response
+
+      // Clear cart on successful order creation
+      localStorage.removeItem('customiseyou-cart');
+
+      // Redirect based on payment method
+      if (paymentMethod === 'COD') {
+        showToast('Order placed successfully!', 'success');
+        router.push(`/orders/${data.orderId}`);
+      } else {
+        showToast('Redirecting to payment...', 'info');
+        router.push(`/orders/${data.orderId}/payment`);
+      }
+    } catch (err: any) {
+      console.error('Error placing order:', err);
+      showToast(err.message || 'Failed to place order. Please try again.', 'error');
+    } finally {
+      setPlacingOrder(false);
+    }
   };
 
   const getAddressIcon = (type: AddressType) => {
@@ -269,14 +334,69 @@ export default function CheckoutPage() {
             )}
           </Paper>
 
-          {/* Payment Method (Placeholder) */}
+          {/* Payment Method */}
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
               Payment Method
             </Typography>
-            <Alert severity="info">
-              Payment integration will be available soon. Order will be created as pending payment.
-            </Alert>
+            <RadioGroup
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as 'COD' | 'ONLINE')}
+            >
+              <Card
+                variant="outlined"
+                sx={{
+                  mb: 2,
+                  border: paymentMethod === 'COD' ? 2 : 1,
+                  borderColor: paymentMethod === 'COD' ? 'primary.main' : 'divider',
+                }}
+              >
+                <CardContent>
+                  <FormControlLabel
+                    value="COD"
+                    control={<Radio />}
+                    label={
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          Cash on Delivery (COD)
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Pay when you receive the order
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                </CardContent>
+              </Card>
+
+              <Card
+                variant="outlined"
+                sx={{
+                  border: paymentMethod === 'ONLINE' ? 2 : 1,
+                  borderColor: paymentMethod === 'ONLINE' ? 'primary.main' : 'divider',
+                }}
+              >
+                <CardContent>
+                  <FormControlLabel
+                    value="ONLINE"
+                    control={<Radio />}
+                    label={
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          Online Payment
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Pay securely online (UPI, Card, Net Banking)
+                        </Typography>
+                        <Alert severity="info" sx={{ mt: 1 }}>
+                          Payment gateway integration coming soon
+                        </Alert>
+                      </Box>
+                    }
+                  />
+                </CardContent>
+              </Card>
+            </RadioGroup>
           </Paper>
         </Grid>
 
@@ -352,10 +472,10 @@ export default function CheckoutPage() {
               variant="contained"
               fullWidth
               size="large"
-              disabled={!selectedAddressId || cartState.items.length === 0}
+              disabled={!selectedAddressId || cartState.items.length === 0 || placingOrder}
               onClick={handlePlaceOrder}
             >
-              Place Order
+              {placingOrder ? 'Placing Order...' : paymentMethod === 'COD' ? 'Place Order' : 'Proceed to Payment'}
             </Button>
 
             <Button

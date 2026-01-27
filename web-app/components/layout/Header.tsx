@@ -12,14 +12,18 @@ import {
   Badge,
 } from '@mui/material';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function Header() {
   const { isAuthenticated, user, logout } = useAuth();
   const { state } = useCart();
+  const { state: wishlistState } = useWishlist();
   const router = useRouter();
 
   return (
@@ -41,6 +45,21 @@ export default function Header() {
           </Typography>
 
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            {/* Wishlist Icon */}
+            <IconButton
+              color="inherit"
+              onClick={() => router.push('/wishlist')}
+              aria-label="wishlist"
+            >
+              <Badge badgeContent={wishlistState.items.length} color="error">
+                {wishlistState.items.length > 0 ? (
+                  <FavoriteIcon />
+                ) : (
+                  <FavoriteBorderIcon />
+                )}
+              </Badge>
+            </IconButton>
+
             {/* Cart Icon */}
             <IconButton
               color="inherit"

@@ -17,6 +17,24 @@ export interface CreateOrderRequest {
   couponCode?: string;
 }
 
+export interface CreateOrderIntentRequest {
+  userId: string;
+  cartItems: Array<{
+    productId: string;
+    name: string;
+    price: number;
+    quantity: number;
+    customizations: Array<{
+      customizationId: string;
+      label: string;
+      value: string;
+      priceAdjustment: number;
+    }>;
+  }>;
+  addressId: string;
+  paymentMethod: 'COD' | 'ONLINE';
+}
+
 export interface OrderUpdateRequest {
   status?: string;
   trackingNumber?: string;
@@ -28,6 +46,158 @@ class OrderService {
 
   constructor(dbPool: Pool) {
     this.db = dbPool;
+  }
+
+  /**
+   * Create order intent (Myntra-style)
+   * - COD orders: status = CONFIRMED, no payment required
+   * - ONLINE orders: status = PENDING_PAYMENT, payment required
+   */
+  async createOrderIntent(orderData: CreateOrderIntentRequest) {
+    const client = await this.db.connect();
+    try {
+      await client.query('BEGIN');
+
+      const orderId = uuidv4();
+      const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`.toUpperCase();
+
+      // Calculate order totals from cart items (already calculated in frontend)
+      let subtotal = 0;
+      const itemsToCreate = [];
+
+      for (const item of orderData.cartItems) {
+        // Calculate item total (base price + customization adjustments)
+        const customizationTotal = item.customizations.reduce(
+          (sum, custom) => sum + custom.priceAdjustment,
+          0
+        );
+        const itemPrice = (item.price + customizationTotal) * item.quantity;
+        subtotal += itemPrice;
+
+        // Verify product exists and get seller
+        const productResult = await client.query(
+          'SELECT id, seller_id, quantity_available FROM products WHERE id = $1',
+          [item.productId]
+        );
+
+        if (productResult.rows.length === 0) {
+          throw new Error(`Product ${item.productId} not found`);
+        }
+
+        const product = productResult.rows[0];
+
+        // Check stock availability
+        if (product.quantity_available < item.quantity) {
+          throw new Error(`Insufficient stock for product ${item.productId}`);
+        }
+
+        itemsToCreate.push({
+          productId: product.id,
+          sellerId: product.seller_id,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          subtotal: itemPrice,
+          customizations: item.customizations,
+        });
+      }
+
+      // Calculate additional charges
+      const tax = subtotal * 0.18; // 18% GST
+      const shippingCost = 0; // Free shipping
+      const platformFee = subtotal * 0.02; // 2% platform fee
+      const totalAmount = subtotal + tax + shippingCost + platformFee;
+
+      // Determine order status based on payment method
+      const orderStatus = orderData.paymentMethod === 'COD' ? 'confirmed' : 'pending';
+      const paymentStatus = orderData.paymentMethod === 'COD' ? 'pending' : 'pending';
+
+      // Create order
+      const orderResult = await client.query(
+        `INSERT INTO orders (
+          id, order_number, user_id, seller_id, status, subtotal, tax_amount, 
+          shipping_cost, platform_fee, total_amount, shipping_address_id, 
+          billing_address_id, payment_method, payment_status, currency
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        RETURNING *`,
+        [
+          orderId,
+          orderNumber,
+          orderData.userId,
+          itemsToCreate[0].sellerId, // Use first seller ID
+          orderStatus,
+          subtotal,
+          tax,
+          shippingCost,
+          platformFee,
+          totalAmount,
+          orderData.addressId,
+          orderData.addressId, // Use same for billing
+          orderData.paymentMethod.toLowerCase(),
+          paymentStatus,
+          'INR',
+        ]
+      );
+
+      // Create order items
+      for (const item of itemsToCreate) {
+        const itemId = uuidv4();
+        
+        await client.query(
+          `INSERT INTO order_items (
+            id, order_id, product_id, quantity, unit_price, subtotal, item_status
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            itemId,
+            orderId,
+            item.productId,
+            item.quantity,
+            item.unitPrice,
+            item.subtotal,
+            orderStatus,
+          ]
+        );
+
+        // Create customizations for this item
+        for (const custom of item.customizations) {
+          await client.query(
+            `INSERT INTO order_customizations (
+              id, order_item_id, customization_id, customization_value, price_adjustment
+            ) VALUES ($1, $2, $3, $4, $5)`,
+            [
+              uuidv4(),
+              itemId,
+              custom.customizationId,
+              custom.value,
+              custom.priceAdjustment,
+            ]
+          );
+        }
+
+        // For COD orders, reduce inventory immediately
+        if (orderData.paymentMethod === 'COD') {
+          await client.query(
+            'UPDATE products SET quantity_available = quantity_available - $1 WHERE id = $2',
+            [item.quantity, item.productId]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+
+      return {
+        orderId: orderResult.rows[0].id,
+        orderNumber: orderResult.rows[0].order_number,
+        amount: totalAmount,
+        paymentRequired: orderData.paymentMethod === 'ONLINE',
+        paymentMethod: orderData.paymentMethod,
+        status: orderStatus,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   /**
@@ -180,16 +350,29 @@ class OrderService {
       );
 
       const ordersResult = await this.db.query(
-        `SELECT id, order_number, status, total_amount, payment_status, 
-                created_at, estimated_delivery_date, tracking_number
-         FROM orders WHERE user_id = $1 
-         ORDER BY created_at DESC 
+        `SELECT 
+          o.id, 
+          o.order_number, 
+          o.status, 
+          o.total_amount, 
+          o.payment_method,
+          o.payment_status, 
+          o.created_at, 
+          o.estimated_delivery_date, 
+          o.tracking_number,
+          COUNT(oi.id)::int as item_count
+         FROM orders o
+         LEFT JOIN order_items oi ON o.id = oi.order_id
+         WHERE o.user_id = $1 
+         GROUP BY o.id, o.order_number, o.status, o.total_amount, o.payment_method, 
+                  o.payment_status, o.created_at, o.estimated_delivery_date, o.tracking_number
+         ORDER BY o.created_at DESC 
          LIMIT $2 OFFSET $3`,
         [userId, limit, offset]
       );
 
       return {
-        data: ordersResult.rows,
+        orders: ordersResult.rows,
         total: parseInt(countResult.rows[0].total),
         page,
         limit,
@@ -251,7 +434,7 @@ class OrderService {
       return {
         ...order,
         items,
-        shippingAddress: addressResult.rows[0] || null,
+        shipping_address: addressResult.rows[0] || null,
         timeline: [
           { status: 'pending', timestamp: order.created_at },
           ...(order.confirmed_at ? [{ status: 'confirmed', timestamp: order.confirmed_at }] : []),

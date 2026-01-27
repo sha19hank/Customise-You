@@ -6,6 +6,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { theme } from '@/theme/theme';
 import { AuthProvider } from '@/context/AuthContext';
 import { CartProvider } from '@/context/CartContext';
+import { WishlistProvider } from '@/context/WishlistContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 import Header from '@/components/layout/Header';
 
@@ -27,10 +28,12 @@ export default function RootLayout({
             <CssBaseline />
             <NotificationProvider>
               <AuthProvider>
-                <CartProvider>
-                  <Header />
-                  <main>{children}</main>
-                </CartProvider>
+                <WishlistProvider>
+                  <CartProvider>
+                    <Header />
+                    <main>{children}</main>
+                  </CartProvider>
+                </WishlistProvider>
               </AuthProvider>
             </NotificationProvider>
           </ThemeProvider>
