@@ -7,7 +7,106 @@ import { getDatabase } from '../config/database';
 
 const router = Router();
 
-router.use(requireAuth, requireRole('seller', 'admin'));
+/**
+ * POST /seller/onboard - Convert buyer to seller (no auth middleware on this route)
+ */
+router.post(
+  '/onboard',
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = (req as any).user?.userId;
+
+      if (!userId) {
+        throw new ValidationError('User not authenticated');
+      }
+
+      const db = await getDatabase();
+
+      // Check if user already has a seller account
+      const existingSeller = await db.query(
+        'SELECT id FROM sellers WHERE user_id = $1',
+        [userId]
+      );
+
+      if (existingSeller.rows.length > 0) {
+        // Seller already exists - just update user role if needed
+        const userCheck = await db.query(
+          'SELECT role FROM users WHERE id = $1',
+          [userId]
+        );
+
+        if (userCheck.rows[0]?.role !== 'seller') {
+          await db.query(
+            'UPDATE users SET role = $1 WHERE id = $2',
+            ['seller', userId]
+          );
+        }
+
+        // Get updated user data
+        const userData = await db.query(
+          'SELECT id, email, first_name, last_name, phone, role, created_at FROM users WHERE id = $1',
+          [userId]
+        );
+
+        return res.status(200).json({
+          success: true,
+          message: 'Seller account already exists',
+          data: {
+            user: userData.rows[0],
+            sellerId: existingSeller.rows[0].id,
+          },
+        });
+      }
+
+      // Create new seller record
+      const sellerResult = await db.query(
+        `INSERT INTO sellers (
+          user_id, 
+          business_name, 
+          country, 
+          level, 
+          experience_points
+        ) VALUES ($1, $2, $3, $4, $5)
+        RETURNING id`,
+        [
+          userId,
+          'My Shop', // Default business name
+          'India',
+          1,
+          0,
+        ]
+      );
+
+      const sellerId = sellerResult.rows[0].id;
+
+      // Update user role to seller
+      await db.query(
+        'UPDATE users SET role = $1 WHERE id = $2',
+        ['seller', userId]
+      );
+
+      // Get updated user data
+      const userData = await db.query(
+        'SELECT id, email, first_name, last_name, phone, role, created_at FROM users WHERE id = $1',
+        [userId]
+      );
+
+      res.status(201).json({
+        success: true,
+        message: 'Successfully onboarded as seller',
+        data: {
+          user: userData.rows[0],
+          sellerId: sellerId,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.use(requireRole('seller', 'admin'));
 
 /**
  * GET /seller/products - Get seller's products

@@ -19,6 +19,11 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
@@ -33,6 +38,7 @@ import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import StorefrontIcon from '@mui/icons-material/Storefront';
 import { useAuth } from '@/context/AuthContext';
 import { userService, UpdateProfileData, UserProfile } from '@/services/user.service';
 import { addressService } from '@/services/address.service';
@@ -63,6 +69,9 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [sellerDialogOpen, setSellerDialogOpen] = useState(false);
+  const [isOnboarding, setIsOnboarding] = useState(false);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -195,6 +204,59 @@ export default function ProfilePage() {
       setError(err.response?.data?.error?.message || 'Failed to update profile');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleBecomeSellerClick = () => {
+    setOnboardingError(null);
+    setSellerDialogOpen(true);
+  };
+
+  const handleOnboardSeller = async () => {
+    try {
+      setIsOnboarding(true);
+      setOnboardingError(null);
+
+      console.log('Calling /seller/onboard...');
+      const response = await apiClient.post('/seller/onboard');
+      console.log('Onboard response:', response.data);
+
+      if (response.data.success) {
+        // Update user data directly from the response
+        const updatedUser = response.data.data.user;
+        console.log('Updated user from backend:', updatedUser);
+        
+        // Update localStorage with the new user data
+        const userToStore = {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          firstName: updatedUser.first_name || '',
+          lastName: updatedUser.last_name || '',
+          phone: updatedUser.phone,
+          role: updatedUser.role,
+        };
+        console.log('Storing in localStorage:', userToStore);
+        localStorage.setItem('user', JSON.stringify(userToStore));
+        
+        // Verify it was stored
+        const stored = localStorage.getItem('user');
+        console.log('Verified localStorage user:', stored);
+        
+        // Close dialog
+        setSellerDialogOpen(false);
+        
+        // Use full page navigation to ensure seller layout sees updated localStorage
+        console.log('Redirecting to /seller/dashboard...');
+        window.location.href = '/seller/dashboard';
+      }
+    } catch (err: any) {
+      console.error('Error onboarding as seller:', err);
+      console.error('Error response:', err.response?.data);
+      setOnboardingError(
+        err.response?.data?.error?.message || 'Failed to become a seller. Please try again.'
+      );
+    } finally {
+      setIsOnboarding(false);
     }
   };
 
@@ -499,6 +561,65 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
+      {/* Seller Onboarding Card */}
+      {profile.role !== 'seller' && profile.role !== 'admin' && (
+        <Card sx={{ mb: 3, bgcolor: 'primary.50', borderColor: 'primary.main', borderWidth: 1, borderStyle: 'solid' }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+              <StorefrontIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+              <Box>
+                <Typography variant="h6" fontWeight="bold" gutterBottom>
+                  Start Selling on CustomiseYou
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Turn your creativity into a business. Join our marketplace today!
+                </Typography>
+              </Box>
+            </Box>
+            <Button
+              variant="contained"
+              size="large"
+              fullWidth
+              onClick={handleBecomeSellerClick}
+              startIcon={<StorefrontIcon />}
+              sx={{ mt: 2 }}
+            >
+              Become a Seller
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Seller Dashboard Link - For existing sellers */}
+      {(profile.role === 'seller' || profile.role === 'admin') && (
+        <Card sx={{ mb: 3, bgcolor: 'success.50', borderColor: 'success.main', borderWidth: 1, borderStyle: 'solid' }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+              <StorefrontIcon sx={{ fontSize: 40, color: 'success.main' }} />
+              <Box>
+                <Typography variant="h6" fontWeight="bold" gutterBottom>
+                  Seller Dashboard
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Manage your products, orders, and view analytics
+                </Typography>
+              </Box>
+            </Box>
+            <Button
+              variant="contained"
+              color="success"
+              size="large"
+              fullWidth
+              onClick={() => router.push('/seller/dashboard')}
+              endIcon={<ArrowForwardIcon />}
+              sx={{ mt: 2 }}
+            >
+              Go to Seller Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* My Orders Card */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
@@ -674,6 +795,75 @@ export default function ProfilePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Seller Onboarding Dialog */}
+      <Dialog
+        open={sellerDialogOpen}
+        onClose={() => !isOnboarding && setSellerDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <StorefrontIcon color="primary" />
+            <Typography variant="h6" fontWeight="bold">
+              Start Selling on CustomiseYou
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {onboardingError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {onboardingError}
+            </Alert>
+          )}
+          <Typography variant="body1" paragraph>
+            Ready to turn your creativity into a business? Here's what you get:
+          </Typography>
+          <List>
+            <ListItem>
+              <ListItemIcon>
+                <CheckCircleIcon color="success" />
+              </ListItemIcon>
+              <ListItemText primary="List and sell custom products" />
+            </ListItem>
+            <ListItem>
+              <ListItemIcon>
+                <CheckCircleIcon color="success" />
+              </ListItemIcon>
+              <ListItemText primary="Platform commission applies" />
+            </ListItem>
+            <ListItem>
+              <ListItemIcon>
+                <CheckCircleIcon color="success" />
+              </ListItemIcon>
+              <ListItemText primary="You manage delivery to customers" />
+            </ListItem>
+            <ListItem>
+              <ListItemIcon>
+                <CheckCircleIcon color="success" />
+              </ListItemIcon>
+              <ListItemText primary="Access seller analytics and insights" />
+            </ListItem>
+          </List>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            onClick={() => setSellerDialogOpen(false)}
+            disabled={isOnboarding}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleOnboardSeller}
+            variant="contained"
+            disabled={isOnboarding}
+            startIcon={isOnboarding ? <CircularProgress size={20} /> : <StorefrontIcon />}
+          >
+            {isOnboarding ? 'Processing...' : 'Yes, Start Selling'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

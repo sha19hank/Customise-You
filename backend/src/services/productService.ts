@@ -256,6 +256,122 @@ class ProductService {
       throw new Error(`Product search failed: ${errorMessage}`);
     }
   }
+
+  /**
+   * Create a new product
+   */
+  async createProduct(productData: {
+    name: string;
+    description: string;
+    price: number;
+    stock_quantity: number;
+    category_id: string;
+    seller_id: string;
+    is_customizable: boolean;
+  }) {
+    try {
+      const result = await this.db.query(
+        `INSERT INTO products (name, description, base_price, final_price, stock_quantity, category_id, seller_id, is_customizable, status)
+         VALUES ($1, $2, $3, $3, $4, $5, $6, $7, 'active')
+         RETURNING *`,
+        [
+          productData.name,
+          productData.description,
+          productData.price,
+          productData.stock_quantity,
+          productData.category_id,
+          productData.seller_id,
+          productData.is_customizable,
+        ]
+      );
+
+      return result.rows[0];
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to create product: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Update an existing product
+   */
+  async updateProduct(productId: string, updates: {
+    name?: string;
+    description?: string;
+    price?: number;
+    stock_quantity?: number;
+    category_id?: string;
+    is_customizable?: boolean;
+  }) {
+    try {
+      const updateFields: string[] = [];
+      const queryParams: any[] = [];
+      let paramCount = 1;
+
+      if (updates.name !== undefined) {
+        updateFields.push(`name = $${paramCount}`);
+        queryParams.push(updates.name);
+        paramCount++;
+      }
+
+      if (updates.description !== undefined) {
+        updateFields.push(`description = $${paramCount}`);
+        queryParams.push(updates.description);
+        paramCount++;
+      }
+
+      if (updates.price !== undefined) {
+        updateFields.push(`base_price = $${paramCount}`);
+        queryParams.push(updates.price);
+        paramCount++;
+        updateFields.push(`final_price = $${paramCount}`);
+        queryParams.push(updates.price);
+        paramCount++;
+      }
+
+      if (updates.stock_quantity !== undefined) {
+        updateFields.push(`stock_quantity = $${paramCount}`);
+        queryParams.push(updates.stock_quantity);
+        paramCount++;
+      }
+
+      if (updates.category_id !== undefined) {
+        updateFields.push(`category_id = $${paramCount}`);
+        queryParams.push(updates.category_id);
+        paramCount++;
+      }
+
+      if (updates.is_customizable !== undefined) {
+        updateFields.push(`is_customizable = $${paramCount}`);
+        queryParams.push(updates.is_customizable);
+        paramCount++;
+      }
+
+      if (updateFields.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+      queryParams.push(productId);
+
+      const result = await this.db.query(
+        `UPDATE products 
+         SET ${updateFields.join(', ')}
+         WHERE id = $${paramCount}
+         RETURNING *`,
+        queryParams
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error('Product not found');
+      }
+
+      return result.rows[0];
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to update product: ${errorMessage}`);
+    }
+  }
 }
 
 export default ProductService;

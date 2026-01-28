@@ -4,6 +4,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import ProductService from '../services/productService';
 import { ValidationError } from '../middleware/errorHandler';
 import { getDatabase } from '../config/database';
+import { requireAuth, requireRole } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -122,6 +123,80 @@ router.get(
       res.status(200).json({
         success: true,
         data: product,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /products - Create a new product (seller only)
+ */
+router.post(
+  '/',
+  requireAuth,
+  requireRole('seller', 'admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const db = await getDatabase();
+      const productService = new ProductService(db);
+      const { name, description, price, stock_quantity, category_id, seller_id, is_customizable } = req.body;
+
+      if (!name || !description || !price || !stock_quantity || !category_id || !seller_id) {
+        throw new ValidationError('Missing required fields');
+      }
+
+      const newProduct = await productService.createProduct({
+        name,
+        description,
+        price,
+        stock_quantity,
+        category_id,
+        seller_id,
+        is_customizable: is_customizable || false,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: newProduct,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * PUT /products/:id - Update a product (seller only)
+ */
+router.put(
+  '/:id',
+  requireAuth,
+  requireRole('seller', 'admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const db = await getDatabase();
+      const productService = new ProductService(db);
+      const { id } = req.params;
+      const { name, description, price, stock_quantity, category_id, is_customizable } = req.body;
+
+      if (!id) {
+        throw new ValidationError('Product ID is required');
+      }
+
+      const updatedProduct = await productService.updateProduct(id, {
+        name,
+        description,
+        price,
+        stock_quantity,
+        category_id,
+        is_customizable,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: updatedProduct,
       });
     } catch (error) {
       next(error);

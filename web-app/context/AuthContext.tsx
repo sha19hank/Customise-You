@@ -87,6 +87,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const profile = await fetchUserProfile(user.id);
       if (profile) {
         setUser(profile);
+        // Update localStorage so other components see the updated role
+        localStorage.setItem('user', JSON.stringify(profile));
       }
     } catch (error) {
       console.error('Error refreshing user profile:', error);

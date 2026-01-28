@@ -8,7 +8,7 @@ import { getDatabase } from '../config/database';
 
 const router = Router();
 
-router.use(requireAuth, requireRole('user', 'admin'));
+router.use(requireAuth, requireRole('user', 'seller', 'admin'));
 
 /**
  * GET /users/me - Get current user profile
