@@ -10,10 +10,12 @@ import {
   Box,
   IconButton,
   Badge,
+  Tooltip,
 } from '@mui/material';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import FavoriteIcon from '@mui/icons-material/Favorite';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
@@ -73,14 +75,17 @@ export default function Header() {
 
             {isAuthenticated ? (
               <>
-                <Button
-                  color="inherit"
-                  component={Link}
-                  href="/profile"
-                  sx={{ textTransform: 'none' }}
-                >
-                  Hi, {user?.firstName || user?.email.split('@')[0] || 'User'}
-                </Button>
+                {/* Profile Icon */}
+                <Tooltip title={`Hi, ${user?.firstName || user?.email.split('@')[0] || 'User'}`} arrow>
+                  <IconButton
+                    color="inherit"
+                    onClick={() => router.push('/profile')}
+                    aria-label="profile"
+                    sx={{ ml: 1 }}
+                  >
+                    <AccountCircleIcon sx={{ fontSize: 32 }} />
+                  </IconButton>
+                </Tooltip>
                 <Button color="inherit" onClick={logout}>
                   Logout
                 </Button>

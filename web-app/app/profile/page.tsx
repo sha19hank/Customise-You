@@ -29,11 +29,23 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import HomeIcon from '@mui/icons-material/Home';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useAuth } from '@/context/AuthContext';
 import { userService, UpdateProfileData, UserProfile } from '@/services/user.service';
 import { addressService } from '@/services/address.service';
 import { Address } from '@/types/address';
+import apiClient from '@/services/api';
 import { useRouter } from 'next/navigation';
+
+interface OrderSummary {
+  id: string;
+  order_number: string;
+  status: string;
+  total_amount: number;
+  payment_method: string;
+  created_at: string;
+}
 
 export default function ProfilePage() {
   const { user: authUser, isAuthenticated, loading: authLoading, refreshUserProfile } = useAuth();
@@ -41,8 +53,10 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [addressesLoading, setAddressesLoading] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +126,30 @@ export default function ProfilePage() {
     }
   }, [authUser]);
 
+  // Fetch recent orders
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!authUser?.id) return;
+
+      try {
+        setOrdersLoading(true);
+        const response = await apiClient.get(`/orders/user/${authUser.id}`);
+        const ordersData = response.data.data.orders || [];
+        // Get only the 3 most recent orders
+        setOrders(ordersData.slice(0, 3));
+      } catch (err: any) {
+        console.error('Error fetching orders:', err);
+        // Don't show error for orders as it's not critical
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
+
+    if (authUser?.id) {
+      fetchOrders();
+    }
+  }, [authUser]);
+
   const handleEditToggle = () => {
     if (isEditing) {
       // Cancel editing - reset form
@@ -168,6 +206,20 @@ export default function ProfilePage() {
       });
     } catch {
       return 'N/A';
+    }
+  };
+
+  const getStatusColor = (status: string): 'default' | 'primary' | 'success' | 'warning' | 'error' => {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'cancelled':
+      case 'expired':
+        return 'error';
+      default:
+        return 'default';
     }
   };
 
@@ -397,6 +449,91 @@ export default function ProfilePage() {
                 </Box>
               </Grid>
             </Grid>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* My Orders Card */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" fontWeight="bold">
+              My Orders
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              endIcon={<ArrowForwardIcon />}
+              onClick={() => router.push('/orders')}
+            >
+              View All Orders
+            </Button>
+          </Box>
+
+          {ordersLoading ? (
+            <Box>
+              <Skeleton variant="rectangular" height={80} sx={{ mb: 1, borderRadius: 1 }} />
+              <Skeleton variant="rectangular" height={80} sx={{ borderRadius: 1 }} />
+            </Box>
+          ) : orders.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <ShoppingBagIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                No orders yet
+              </Typography>
+              <Button
+                variant="contained"
+                size="small"
+                sx={{ mt: 2 }}
+                onClick={() => router.push('/products')}
+              >
+                Start Shopping
+              </Button>
+            </Box>
+          ) : (
+            <List disablePadding>
+              {orders.map((order, index) => (
+                <React.Fragment key={order.id}>
+                  {index > 0 && <Divider />}
+                  <ListItem
+                    sx={{
+                      px: 0,
+                      py: 2,
+                      cursor: 'pointer',
+                      '&:hover': { backgroundColor: 'action.hover' },
+                      borderRadius: 1,
+                    }}
+                    onClick={() => router.push(`/orders/${order.id}`)}
+                  >
+                    <ListItemIcon>
+                      <ShoppingBagIcon color="primary" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                          <Typography variant="body2" fontWeight="medium">
+                            {order.order_number}
+                          </Typography>
+                          <Chip
+                            label={order.status.toUpperCase()}
+                            size="small"
+                            color={getStatusColor(order.status)}
+                          />
+                        </Box>
+                      }
+                      secondary={
+                        <Box sx={{ mt: 0.5 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {formatDate(order.created_at)} • ${Number(order.total_amount).toFixed(2)}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                    <ArrowForwardIcon sx={{ color: 'action.active' }} />
+                  </ListItem>
+                </React.Fragment>
+              ))}
+            </List>
           )}
         </CardContent>
       </Card>
