@@ -16,6 +16,7 @@
     "migrate:status": "ts-node src/migrate.ts status",
     "migrate:reset": "ts-node src/migrate.ts reset",
     "db:seed": "ts-node src/seeds/index.ts",
+    "db:seed:demo-products": "ts-node src/seeds/run_demo_products.ts",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "docker:build": "docker build -t customiseyou-backend .",

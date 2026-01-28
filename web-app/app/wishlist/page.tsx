@@ -19,15 +19,20 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import { useRouter } from 'next/navigation';
 import { useWishlist } from '@/context/WishlistContext';
+import { useCart, CartCustomization } from '@/context/CartContext';
+import { useNotification } from '@/context/NotificationContext';
 import { productService } from '@/services/product.service';
 import { Product } from '@/types/product';
 
 export default function WishlistPage() {
   const router = useRouter();
   const { state, removeFromWishlist } = useWishlist();
+  const { addItem } = useCart();
+  const { showToast } = useNotification();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [addingToCart, setAddingToCart] = useState<string | null>(null);
 
   // Fetch product details for wishlisted items
   useEffect(() => {
@@ -66,9 +71,35 @@ export default function WishlistPage() {
     removeFromWishlist(productId);
   };
 
-  const handleAddToCart = (productId: string) => {
-    // Navigate to product details page where user can select customizations and add to cart
-    router.push(`/products/${productId}`);
+  const handleAddToCart = async (product: Product) => {
+    // Check if product has customizations
+    if (product.is_customizable) {
+      // Redirect to product page for customization selection
+      router.push(`/products/${product.id}`);
+      return;
+    }
+
+    // Product has no customizations - add directly to cart
+    try {
+      setAddingToCart(product.id);
+
+      const cartItem = {
+        productId: product.id,
+        name: product.name,
+        price: Number(product.base_price),
+        quantity: 1,
+        selectedCustomizations: [] as CartCustomization[],
+        productImage: product.image_url || product.images?.[0] || '/placeholder-product.jpg',
+      };
+
+      addItem(cartItem);
+      showToast(`${product.name} added to cart`, 'success');
+    } catch (err) {
+      console.error('Error adding to cart:', err);
+      showToast('Failed to add item to cart', 'error');
+    } finally {
+      setAddingToCart(null);
+    }
   };
 
   if (loading) {
@@ -209,10 +240,11 @@ export default function WishlistPage() {
                       variant="contained"
                       fullWidth
                       startIcon={<ShoppingCartOutlinedIcon />}
-                      onClick={() => handleAddToCart(product.id)}
-                      disabled={product.status !== 'active' || product.stock_quantity === 0}
+                      onClick={() => handleAddToCart(product)}
+                      disabled={product.status !== 'active' || product.stock_quantity === 0 || addingToCart === product.id}
+                      data-testid={`add-to-cart-${product.id}`}
                     >
-                      {product.stock_quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+                      {addingToCart === product.id ? 'Adding...' : product.stock_quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
                     </Button>
                   </Box>
                 </CardContent>

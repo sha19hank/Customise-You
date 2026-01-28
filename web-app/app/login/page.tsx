@@ -102,6 +102,9 @@ export default function LoginPage() {
                 required
                 autoComplete="email"
                 autoFocus
+                inputProps={{
+                  'data-testid': 'login-email',
+                }}
               />
 
               <TextField
@@ -113,6 +116,9 @@ export default function LoginPage() {
                 margin="normal"
                 required
                 autoComplete="current-password"
+                inputProps={{
+                  'data-testid': 'login-password',
+                }}
               />
 
               <Button
@@ -122,6 +128,7 @@ export default function LoginPage() {
                 size="large"
                 disabled={loading}
                 sx={{ mt: 3, mb: 2 }}
+                data-testid="login-submit"
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </Button>

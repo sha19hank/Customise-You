@@ -3,6 +3,7 @@ import { initializeDatabase, closeDatabaseConnection, pool } from '../config/dat
 import { seedAdminUser } from './seed_admin';
 import { seedCategories } from './seed_categories';
 import { seedDemoData } from './seed_demo';
+import { seedDemoProducts } from './seed_demo_products';
 
 // Load environment variables
 dotenv.config();
@@ -37,6 +38,11 @@ const runSeeds = async () => {
     const demoResult = await seedDemoData(pool);
     console.log(demoResult);
   }
+
+  // Always seed Etsy-style demo products for E2E testing
+  console.log('🔹 Seeding Etsy-style demo products...');
+  const demoProductsResult = await seedDemoProducts(pool);
+  console.log(demoProductsResult);
 
   await closeDatabaseConnection();
   console.log('✅ Seeding completed');

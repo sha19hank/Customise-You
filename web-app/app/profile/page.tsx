@@ -31,6 +31,8 @@ import HomeIcon from '@mui/icons-material/Home';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { useAuth } from '@/context/AuthContext';
 import { userService, UpdateProfileData, UserProfile } from '@/services/user.service';
 import { addressService } from '@/services/address.service';
@@ -247,15 +249,59 @@ export default function ProfilePage() {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      {/* Page Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          My Profile
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Manage your personal information and addresses
-        </Typography>
+      {/* Page Header with Avatar */}
+      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
+        <Box
+          sx={{
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            bgcolor: 'primary.main',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+          }}
+        >
+          <AccountCircleIcon sx={{ fontSize: 60 }} />
+        </Box>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="h4" fontWeight="bold" gutterBottom>
+            {profile.firstName || 'User'} {profile.lastName || ''}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {profile.email}
+          </Typography>
+        </Box>
       </Box>
+
+      {/* Quick Navigation Buttons */}
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={6}>
+          <Button
+            fullWidth
+            variant="outlined"
+            size="large"
+            startIcon={<ShoppingBagIcon />}
+            onClick={() => router.push('/orders')}
+            sx={{ py: 1.5 }}
+          >
+            My Orders
+          </Button>
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <Button
+            fullWidth
+            variant="outlined"
+            size="large"
+            startIcon={<LocationOnIcon />}
+            onClick={() => router.push('/addresses')}
+            sx={{ py: 1.5 }}
+          >
+            My Addresses
+          </Button>
+        </Grid>
+      </Grid>
 
       {/* Success/Error Messages */}
       {success && (

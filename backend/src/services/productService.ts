@@ -142,14 +142,17 @@ class ProductService {
    */
   async getProductById(productId: string) {
     try {
-      // Get product details
+      // Get product details - support both UUID and slug
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
+      const whereClause = isUUID ? 'p.id = $1' : 'p.slug = $1';
+      
       const productResult = await this.db.query(
         `SELECT p.*, 
                 s.id as seller_id, s.business_name as seller_name, 
                 s.average_rating as seller_rating, s.total_orders as seller_total_orders
          FROM products p
          LEFT JOIN sellers s ON p.seller_id = s.id
-         WHERE p.id = $1 AND p.status = 'active'`,
+         WHERE ${whereClause} AND p.status = 'active'`,
         [productId]
       );
 
@@ -159,15 +162,15 @@ class ProductService {
 
       const product = productResult.rows[0];
 
-      // Get customization options
+      // Get customization options (use product.id from DB result)
       const customizationsResult = await this.db.query(
         `SELECT * FROM customizations 
          WHERE product_id = $1
          ORDER BY display_order ASC`,
-        [productId]
+        [product.id]
       );
 
-      // Get recent reviews
+      // Get recent reviews (use product.id from DB result)
       const reviewsResult = await this.db.query(
         `SELECT r.*, u.first_name, u.last_name, u.profile_image_url
          FROM reviews r
@@ -175,13 +178,13 @@ class ProductService {
          WHERE r.product_id = $1 AND r.status = 'approved'
          ORDER BY r.created_at DESC
          LIMIT 5`,
-        [productId]
+        [product.id]
       );
 
-      // Increment view count
+      // Increment views count (use product.id from DB result)
       await this.db.query(
         'UPDATE products SET views_count = views_count + 1 WHERE id = $1',
-        [productId]
+        [product.id]
       );
 
       return {
