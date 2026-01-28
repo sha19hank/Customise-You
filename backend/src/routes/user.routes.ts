@@ -11,6 +11,68 @@ const router = Router();
 router.use(requireAuth, requireRole('user', 'admin'));
 
 /**
+ * GET /users/me - Get current user profile
+ */
+router.get(
+  '/me',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const db = await getDatabase();
+      const userService = new UserService(db);
+      const userId = (req as any).user?.userId;
+
+      if (!userId) {
+        throw new ValidationError('User not authenticated');
+      }
+
+      const profile = await userService.getUserProfile(userId);
+
+      res.status(200).json({
+        success: true,
+        data: profile,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * PATCH /users/me - Update current user profile
+ */
+router.patch(
+  '/me',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const db = await getDatabase();
+      const userService = new UserService(db);
+      const userId = (req as any).user?.userId;
+      const { firstName, lastName, phone, profileImageUrl, dateOfBirth } = req.body;
+
+      if (!userId) {
+        throw new ValidationError('User not authenticated');
+      }
+
+      const profile = await userService.updateProfile(userId, {
+        firstName,
+        lastName,
+        phone,
+        profileImageUrl,
+        dateOfBirth,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Profile updated successfully',
+        data: profile,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * GET /users/:id - Get user profile
  */
 router.get(

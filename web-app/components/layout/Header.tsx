@@ -73,12 +73,14 @@ export default function Header() {
 
             {isAuthenticated ? (
               <>
-                <Typography
-                  variant="body1"
-                  sx={{ display: 'flex', alignItems: 'center', mr: 2 }}
+                <Button
+                  color="inherit"
+                  component={Link}
+                  href="/profile"
+                  sx={{ textTransform: 'none' }}
                 >
-                  Welcome, {user?.email}
-                </Typography>
+                  Hi, {user?.firstName || user?.email.split('@')[0] || 'User'}
+                </Button>
                 <Button color="inherit" onClick={logout}>
                   Logout
                 </Button>

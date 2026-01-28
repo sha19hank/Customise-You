@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { authService } from '@/services/auth.service';
 import { User, LoginCredentials, RegisterData, AuthResponse } from '@/types/auth';
 import { tokenUtils } from '@/utils/token';
+import apiClient from '@/services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -13,6 +14,7 @@ interface AuthContextType {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUserProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +24,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Fetch full user profile from backend
+  const fetchUserProfile = async (userId: string): Promise<User | null> => {
+    try {
+      const response = await apiClient.get('/users/me');
+      const profileData = response.data.data;
+      
+      // Transform snake_case to camelCase
+      return {
+        id: profileData.id,
+        email: profileData.email,
+        firstName: profileData.first_name || '',
+        lastName: profileData.last_name || '',
+        phone: profileData.phone,
+        role: profileData.role || 'user',
+        profileImageUrl: profileData.profile_image_url,
+      };
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+  };
+
   // Check authentication status on mount
   useEffect(() => {
     const initAuth = async () => {
@@ -29,13 +53,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (authService.isAuthenticated()) {
           const currentUser = authService.getCurrentUser();
           if (currentUser) {
-            setUser({
-              id: currentUser.userId,
-              email: currentUser.email,
-              firstName: '',
-              lastName: '',
-              role: currentUser.role || 'user',
-            });
+            // Fetch full profile with firstName, lastName, etc.
+            const profile = await fetchUserProfile(currentUser.userId);
+            if (profile) {
+              setUser(profile);
+            } else {
+              // Fallback to basic user data from token
+              setUser({
+                id: currentUser.userId,
+                email: currentUser.email,
+                firstName: '',
+                lastName: '',
+                role: currentUser.role || 'user',
+              });
+            }
           }
         }
       } catch (error) {
@@ -49,10 +80,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initAuth();
   }, []);
 
+  const refreshUserProfile = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const profile = await fetchUserProfile(user.id);
+      if (profile) {
+        setUser(profile);
+      }
+    } catch (error) {
+      console.error('Error refreshing user profile:', error);
+    }
+  };
+
   const login = async (credentials: LoginCredentials) => {
     try {
       const authData: AuthResponse = await authService.login(credentials);
-      setUser(authData.user);
+      
+      // Fetch full profile after login
+      const profile = await fetchUserProfile(authData.user.id);
+      setUser(profile || authData.user);
+      
       router.push('/');
     } catch (error: any) {
       console.error('Login error:', error);
@@ -74,7 +122,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = async (data: RegisterData) => {
     try {
       const authData: AuthResponse = await authService.register(data);
-      setUser(authData.user);
+      
+      // Fetch full profile after registration
+      const profile = await fetchUserProfile(authData.user.id);
+      setUser(profile || authData.user);
+      
       router.push('/');
     } catch (error: any) {
       console.error('Registration error:', error);
@@ -112,6 +164,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         register,
         logout,
+        refreshUserProfile,
       }}
     >
       {children}

@@ -6,9 +6,16 @@ export const addressService = {
   /**
    * Get user addresses
    */
-  async getUserAddresses(userId: string): Promise<Address[]> {
+  async getAddresses(userId: string): Promise<Address[]> {
     const response = await apiClient.get(`/users/${userId}/addresses`);
     return response.data.data;
+  },
+
+  /**
+   * Alias for backward compatibility
+   */
+  async getUserAddresses(userId: string): Promise<Address[]> {
+    return this.getAddresses(userId);
   },
 
   /**

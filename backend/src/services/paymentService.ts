@@ -3,8 +3,8 @@
 import { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import Stripe from 'stripe';
-import Razorpay from 'razorpay';
-import crypto from 'crypto';
+const Razorpay = require('razorpay');
+import * as crypto from 'crypto';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2022-11-15',
