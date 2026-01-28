@@ -548,7 +548,7 @@ export default function ProfilePage() {
             <Button
               variant="outlined"
               size="small"
-              onClick={() => router.push('/checkout')}
+              onClick={() => router.push('/addresses')}
             >
               Manage Addresses
             </Button>
@@ -618,7 +618,7 @@ export default function ProfilePage() {
                 <Box sx={{ mt: 2, textAlign: 'center' }}>
                   <Button
                     size="small"
-                    onClick={() => router.push('/checkout')}
+                    onClick={() => router.push('/addresses')}
                   >
                     View All {addresses.length} Addresses
                   </Button>
