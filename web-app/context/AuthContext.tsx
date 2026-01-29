@@ -58,15 +58,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const profile = await fetchUserProfile(currentUser.userId);
             if (profile) {
               setUser(profile);
+              localStorage.setItem('user', JSON.stringify(profile));
             } else {
               // Fallback to basic user data from token
-              setUser({
+              const fallbackUser = {
                 id: currentUser.userId,
                 email: currentUser.email,
                 firstName: '',
                 lastName: '',
                 role: currentUser.role || 'user',
-              });
+              };
+              setUser(fallbackUser);
+              localStorage.setItem('user', JSON.stringify(fallbackUser));
             }
           }
         }
@@ -102,7 +105,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // Fetch full profile after login
       const profile = await fetchUserProfile(authData.user.id);
-      setUser(profile || authData.user);
+      const userData = profile || authData.user;
+      
+      // Save user to state AND localStorage
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      console.log('[AuthContext] User saved to localStorage:', userData);
       
       router.push('/');
     } catch (error: any) {
@@ -128,7 +136,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // Fetch full profile after registration
       const profile = await fetchUserProfile(authData.user.id);
-      setUser(profile || authData.user);
+      const userData = profile || authData.user;
+      
+      // Save user to state AND localStorage
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
       
       router.push('/');
     } catch (error: any) {

@@ -209,13 +209,38 @@ class AuthService {
   /**
    * Refresh access token
    */
-  refreshAccessToken(refreshToken: string): TokenPair {
+  async refreshAccessToken(refreshToken: string): Promise<TokenPair> {
     try {
+      console.log('[AuthService] Attempting to verify refresh token...');
       const decoded = jwt.verify(refreshToken, this.jwtRefreshSecret) as AuthPayload;
+      console.log('[AuthService] Decoded token:', { userId: decoded.userId, email: decoded.email, oldRole: decoded.role });
 
-      return this.generateTokens(decoded);
+      // Fetch latest user data from database to get current role
+      const result = await this.db.query(
+        'SELECT id, email, role FROM users WHERE id = $1',
+        [decoded.userId]
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error('User not found');
+      }
+
+      const user = result.rows[0];
+      console.log('[AuthService] User from DB:', { id: user.id, email: user.email, currentRole: user.role });
+
+      // Generate new tokens with current role from database
+      const newTokens = this.generateTokens({
+        userId: user.id,
+        email: user.email,
+        role: (user.role as AuthPayload['role']) || 'user',
+      });
+
+      console.log('[AuthService] Generated new tokens with role:', user.role);
+      return newTokens;
     } catch (error) {
-      throw new Error('Invalid refresh token');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[AuthService] Refresh token error:', errorMessage);
+      throw new Error(`Invalid refresh token: ${errorMessage}`);
     }
   }
 

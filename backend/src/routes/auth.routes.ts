@@ -116,7 +116,7 @@ router.post(
         throw new ValidationError("Refresh token is required");
       }
 
-      const result = authService.refreshAccessToken(refreshToken);
+      const result = await authService.refreshAccessToken(refreshToken);
 
       res.status(200).json({
         success: true,
