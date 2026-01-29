@@ -98,6 +98,7 @@ router.post(
         data: {
           user: userData.rows[0],
           sellerId: sellerId,
+          kycRequired: true, // KYC must be completed before selling
         },
       });
     } catch (error) {
@@ -106,7 +107,150 @@ router.post(
   }
 );
 
+/**
+ * POST /seller/kyc - Submit KYC details
+ */
+router.post(
+  '/kyc',
+  requireAuth,
+  requireRole('seller', 'admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = (req as any).user?.userId;
+      const { legalFullName, panNumber, bankAccountNumber, bankIfscCode } = req.body;
+
+      if (!userId) {
+        throw new ValidationError('User not authenticated');
+      }
+
+      if (!legalFullName || !panNumber || !bankAccountNumber || !bankIfscCode) {
+        throw new ValidationError('All KYC fields are required');
+      }
+
+      const db = await getDatabase();
+
+      // Check if KYC already exists
+      const existingKyc = await db.query(
+        'SELECT id, status FROM seller_kyc WHERE user_id = $1',
+        [userId]
+      );
+
+      if (existingKyc.rows.length > 0) {
+        throw new ValidationError('KYC already submitted. Please contact support to update.');
+      }
+
+      // Insert KYC record
+      const kycResult = await db.query(
+        `INSERT INTO seller_kyc (
+          user_id,
+          legal_full_name,
+          pan_number,
+          bank_account_number,
+          bank_ifsc_code,
+          status
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, status, submitted_at`,
+        [userId, legalFullName, panNumber, bankAccountNumber, bankIfscCode, 'pending']
+      );
+
+      res.status(201).json({
+        success: true,
+        message: 'KYC submitted successfully. Verification in progress.',
+        data: kycResult.rows[0],
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /seller/kyc - Get KYC status
+ */
+router.get(
+  '/kyc',
+  requireAuth,
+  requireRole('seller', 'admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = (req as any).user?.userId;
+
+      if (!userId) {
+        throw new ValidationError('User not authenticated');
+      }
+
+      const db = await getDatabase();
+      const kycData = await db.query(
+        'SELECT id, status, submitted_at, approved_at, rejected_at, rejection_reason FROM seller_kyc WHERE user_id = $1',
+        [userId]
+      );
+
+      if (kycData.rows.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            status: 'not_submitted',
+            kycRequired: true,
+          },
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: kycData.rows[0],
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 router.use(requireRole('seller', 'admin'));
+
+// Middleware to check KYC status for product/order operations
+const requireKYCApproved = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: { message: 'User not authenticated' },
+      });
+    }
+
+    const db = await getDatabase();
+    const kycData = await db.query(
+      'SELECT status FROM seller_kyc WHERE user_id = $1',
+      [userId]
+    );
+
+    if (kycData.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        error: { 
+          message: 'KYC verification required',
+          code: 'KYC_NOT_SUBMITTED',
+        },
+      });
+    }
+
+    if (kycData.rows[0].status !== 'approved') {
+      return res.status(403).json({
+        success: false,
+        error: { 
+          message: `KYC verification ${kycData.rows[0].status}. Please complete KYC to access seller features.`,
+          code: 'KYC_NOT_APPROVED',
+          status: kycData.rows[0].status,
+        },
+      });
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
 
 /**
  * GET /seller/products - Get seller's products
@@ -198,6 +342,15 @@ router.get(
       }
 
       const db = await getDatabase();
+      
+      // Check KYC status
+      const kycData = await db.query(
+        'SELECT status FROM seller_kyc WHERE user_id = $1',
+        [sellerId]
+      );
+
+      const kycStatus = kycData.rows.length > 0 ? kycData.rows[0].status : 'not_submitted';
+
       const [productsCount, ordersCount, revenue, ratings] = await Promise.all([
         db.query('SELECT COUNT(*) as count FROM products WHERE seller_id = $1', [sellerId]),
         db.query('SELECT COUNT(*) as count FROM orders WHERE seller_id = $1', [sellerId]),
@@ -212,6 +365,8 @@ router.get(
           totalOrders: parseInt(ordersCount.rows[0].count),
           totalRevenue: parseFloat(revenue.rows[0].total) || 0,
           averageRating: parseFloat(ratings.rows[0]?.average_rating) || 0,
+          kycStatus: kycStatus,
+          kycRequired: kycStatus !== 'approved',
         },
       });
     } catch (error) {

@@ -56,7 +56,7 @@ interface OrderSummary {
 }
 
 export default function ProfilePage() {
-  const { user: authUser, isAuthenticated, loading: authLoading, refreshUserProfile } = useAuth();
+  const { user: authUser, isAuthenticated, loading: authLoading, refreshUserProfile, updateUser } = useAuth();
   const router = useRouter();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -72,6 +72,16 @@ export default function ProfilePage() {
   const [sellerDialogOpen, setSellerDialogOpen] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [kycStatus, setKycStatus] = useState<string | null>(null);
+  const [kycDialogOpen, setKycDialogOpen] = useState(false);
+  const [isSubmittingKyc, setIsSubmittingKyc] = useState(false);
+  const [kycError, setKycError] = useState<string | null>(null);
+  const [kycForm, setKycForm] = useState({
+    legalFullName: '',
+    panNumber: '',
+    bankAccountNumber: '',
+    bankIfscCode: '',
+  });
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -112,6 +122,10 @@ export default function ProfilePage() {
 
     if (authUser) {
       fetchProfile();
+      // Fetch KYC status if user is a seller
+      if (authUser.role === 'seller') {
+        fetchKycStatus();
+      }
     }
   }, [authUser]);
 
@@ -222,32 +236,56 @@ export default function ProfilePage() {
       console.log('Onboard response:', response.data);
 
       if (response.data.success) {
-        // Update user data directly from the response
         const updatedUser = response.data.data.user;
         console.log('Updated user from backend:', updatedUser);
         
-        // Update localStorage with the new user data
+        // Create user object for storage
         const userToStore = {
           id: updatedUser.id,
           email: updatedUser.email,
           firstName: updatedUser.first_name || '',
           lastName: updatedUser.last_name || '',
           phone: updatedUser.phone,
-          role: updatedUser.role,
+          role: updatedUser.role, // This should be 'seller' now
         };
-        console.log('Storing in localStorage:', userToStore);
+        
+        console.log('Storing user to localStorage:', userToStore);
         localStorage.setItem('user', JSON.stringify(userToStore));
         
-        // Verify it was stored
-        const stored = localStorage.getItem('user');
-        console.log('Verified localStorage user:', stored);
+        // Update the profile state immediately
+        const updatedProfile = {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          firstName: updatedUser.first_name || '',
+          lastName: updatedUser.last_name || '',
+          phone: updatedUser.phone,
+          role: updatedUser.role,
+          profileImageUrl: profile?.profileImageUrl,
+          createdAt: profile?.createdAt || '',
+        };
         
-        // Close dialog
+        console.log('Updating profile state to:', updatedProfile);
+        setProfile(updatedProfile);
+        
+        // DON'T call updateUser() - it triggers useEffect which re-fetches and overwrites our update!
+        // Just update localStorage so the seller layout can see the new role
+        
+        // Close dialog first
         setSellerDialogOpen(false);
         
-        // Use full page navigation to ensure seller layout sees updated localStorage
-        console.log('Redirecting to /seller/dashboard...');
-        window.location.href = '/seller/dashboard';
+        // Fetch KYC status for the new seller (with small delay to ensure state is set)
+        setTimeout(() => {
+          fetchKycStatus();
+        }, 100);
+        
+        // Show success message with KYC reminder
+        setSuccess('✅ Successfully registered as seller! Scroll down to see your "Seller Dashboard" button. Please complete KYC verification to start selling.');
+        
+        console.log('Seller onboarding complete. New role:', updatedUser.role);
+        console.log('Profile role is now:', updatedProfile.role);
+        
+        // Auto-hide success message after 8 seconds
+        setTimeout(() => setSuccess(null), 8000);
       }
     } catch (err: any) {
       console.error('Error onboarding as seller:', err);
@@ -257,6 +295,47 @@ export default function ProfilePage() {
       );
     } finally {
       setIsOnboarding(false);
+    }
+  };
+
+  const fetchKycStatus = async () => {
+    try {
+      const response = await apiClient.get('/seller/kyc');
+      if (response.data.success) {
+        setKycStatus(response.data.data.status);
+      }
+    } catch (err: any) {
+      console.error('Error fetching KYC status:', err);
+    }
+  };
+
+  const handleSubmitKyc = async () => {
+    try {
+      setIsSubmittingKyc(true);
+      setKycError(null);
+
+      const response = await apiClient.post('/seller/kyc', kycForm);
+
+      if (response.data.success) {
+        setKycDialogOpen(false);
+        setSuccess('KYC submitted successfully! Verification in progress.');
+        fetchKycStatus(); // Refresh KYC status
+        
+        // Reset form
+        setKycForm({
+          legalFullName: '',
+          panNumber: '',
+          bankAccountNumber: '',
+          bankIfscCode: '',
+        });
+      }
+    } catch (err: any) {
+      console.error('Error submitting KYC:', err);
+      setKycError(
+        err.response?.data?.error?.message || 'Failed to submit KYC. Please try again.'
+      );
+    } finally {
+      setIsSubmittingKyc(false);
     }
   };
 
@@ -548,9 +627,10 @@ export default function ProfilePage() {
                     </Typography>
                     <Box sx={{ mt: 0.5 }}>
                       <Chip
-                        label={profile.role.toUpperCase()}
+                        key={`role-${profile.role}`}
+                        label={profile.role === 'admin' ? 'ADMIN' : profile.role === 'seller' ? 'SELLER' : 'USER'}
                         size="small"
-                        color={profile.role === 'admin' ? 'error' : 'primary'}
+                        color={profile.role === 'admin' ? 'error' : profile.role === 'seller' ? 'success' : 'primary'}
                       />
                     </Box>
                   </Box>
@@ -562,7 +642,7 @@ export default function ProfilePage() {
       </Card>
 
       {/* Seller Onboarding Card */}
-      {profile.role !== 'seller' && profile.role !== 'admin' && (
+      {profile && profile.role !== 'seller' && profile.role !== 'admin' && (
         <Card sx={{ mb: 3, bgcolor: 'primary.50', borderColor: 'primary.main', borderWidth: 1, borderStyle: 'solid' }}>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -591,7 +671,7 @@ export default function ProfilePage() {
       )}
 
       {/* Seller Dashboard Link - For existing sellers */}
-      {(profile.role === 'seller' || profile.role === 'admin') && (
+      {profile && (profile.role === 'seller' || profile.role === 'admin') && (
         <Card sx={{ mb: 3, bgcolor: 'success.50', borderColor: 'success.main', borderWidth: 1, borderStyle: 'solid' }}>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -616,6 +696,50 @@ export default function ProfilePage() {
             >
               Go to Seller Dashboard
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* KYC Verification Card - For sellers */}
+      {profile.role === 'seller' && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              KYC Verification
+            </Typography>
+            
+            {kycStatus === 'not_submitted' && (
+              <Box>
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  Complete KYC verification to start selling products on CustomiseYou
+                </Alert>
+                <Button
+                  variant="contained"
+                  onClick={() => setKycDialogOpen(true)}
+                  fullWidth
+                >
+                  Submit KYC Details
+                </Button>
+              </Box>
+            )}
+            
+            {kycStatus === 'pending' && (
+              <Alert severity="info">
+                Your KYC verification is pending review. We'll notify you once approved.
+              </Alert>
+            )}
+            
+            {kycStatus === 'approved' && (
+              <Alert severity="success">
+                ✓ KYC Verified - You can now sell products on CustomiseYou
+              </Alert>
+            )}
+            
+            {kycStatus === 'rejected' && (
+              <Alert severity="error">
+                KYC verification was rejected. Please contact support for assistance.
+              </Alert>
+            )}
           </CardContent>
         </Card>
       )}
@@ -861,6 +985,99 @@ export default function ProfilePage() {
             startIcon={isOnboarding ? <CircularProgress size={20} /> : <StorefrontIcon />}
           >
             {isOnboarding ? 'Processing...' : 'Yes, Start Selling'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* KYC Submission Dialog */}
+      <Dialog
+        open={kycDialogOpen}
+        onClose={() => !isSubmittingKyc && setKycDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Typography variant="h6" fontWeight="bold">
+            Submit KYC Verification
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          {kycError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {kycError}
+            </Alert>
+          )}
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Complete KYC verification to start selling on CustomiseYou. All information is encrypted and secure.
+          </Typography>
+          
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                required
+                label="Legal Full Name"
+                value={kycForm.legalFullName}
+                onChange={(e) => setKycForm({ ...kycForm, legalFullName: e.target.value })}
+                disabled={isSubmittingKyc}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                required
+                label="PAN Number"
+                value={kycForm.panNumber}
+                onChange={(e) => setKycForm({ ...kycForm, panNumber: e.target.value.toUpperCase() })}
+                disabled={isSubmittingKyc}
+                inputProps={{ maxLength: 10 }}
+                helperText="Format: ABCDE1234F"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                required
+                label="Bank Account Number"
+                value={kycForm.bankAccountNumber}
+                onChange={(e) => setKycForm({ ...kycForm, bankAccountNumber: e.target.value })}
+                disabled={isSubmittingKyc}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                required
+                label="Bank IFSC Code"
+                value={kycForm.bankIfscCode}
+                onChange={(e) => setKycForm({ ...kycForm, bankIfscCode: e.target.value.toUpperCase() })}
+                disabled={isSubmittingKyc}
+                inputProps={{ maxLength: 11 }}
+                helperText="Format: ABCD0123456"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            onClick={() => setKycDialogOpen(false)}
+            disabled={isSubmittingKyc}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmitKyc}
+            variant="contained"
+            disabled={
+              isSubmittingKyc ||
+              !kycForm.legalFullName ||
+              !kycForm.panNumber ||
+              !kycForm.bankAccountNumber ||
+              !kycForm.bankIfscCode
+            }
+            startIcon={isSubmittingKyc ? <CircularProgress size={20} /> : null}
+          >
+            {isSubmittingKyc ? 'Submitting...' : 'Submit KYC'}
           </Button>
         </DialogActions>
       </Dialog>

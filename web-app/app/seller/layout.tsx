@@ -68,6 +68,17 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
     };
 
     checkAuth();
+    
+    // Listen for storage changes (in case user becomes seller in another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'user' || e.key === 'customiseyou_access_token') {
+        console.log('[Seller Layout] Storage changed, rechecking auth');
+        checkAuth();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []); // Empty dependency array - only run once on mount
 
   if (loading) {

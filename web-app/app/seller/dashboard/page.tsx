@@ -14,15 +14,21 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import CurrencyRupeeIcon from '@mui/icons-material/CurrencyRupee';
+import WarningIcon from '@mui/icons-material/Warning';
+import apiClient from '@/services/api';
+import { useRouter } from 'next/navigation';
 
 interface DashboardStats {
   totalProducts: number;
   totalOrders: number;
   totalRevenue: number;
   averageRating: number;
+  kycStatus?: string;
+  kycRequired?: boolean;
 }
 
 export default function SellerDashboard() {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,35 +40,31 @@ export default function SellerDashboard() {
   const fetchDashboardStats = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('customiseyou_access_token');
+      setError('');
       const userStr = localStorage.getItem('user');
       
       if (!userStr) {
-        setError('User not found');
+        setError('User not found. Please log in again.');
         return;
       }
 
       const user = JSON.parse(userStr);
       const sellerId = user.id;
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/seller/dashboard?sellerId=${sellerId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
+      console.log('[Dashboard] Fetching stats for seller:', sellerId);
+      const response = await apiClient.get(`/seller/dashboard?sellerId=${sellerId}`);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch dashboard stats');
+      if (response.data.success) {
+        setStats(response.data.data);
+        console.log('[Dashboard] Stats loaded successfully');
       }
-
-      const data = await response.json();
-      setStats(data.data);
     } catch (err: any) {
       console.error('Error fetching dashboard stats:', err);
-      setError(err.message || 'Failed to load dashboard');
+      console.error('Error response:', err.response?.data);
+      
+      // Don't redirect on auth errors, just show error message
+      const errorMessage = err.response?.data?.error?.message || err.message || 'Failed to load dashboard';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -115,6 +117,32 @@ export default function SellerDashboard() {
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
         Overview of your store performance
       </Typography>
+
+      {/* KYC Warning Banner */}
+      {stats?.kycRequired && stats.kycStatus !== 'approved' && (
+        <Alert 
+          severity="warning" 
+          icon={<WarningIcon />}
+          sx={{ mb: 3 }}
+          action={
+            <button
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#ed6c02',
+                textDecoration: 'underline',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+              }}
+              onClick={() => router.push('/profile')}
+            >
+              Complete KYC
+            </button>
+          }
+        >
+          <strong>KYC Verification Required:</strong> Complete your KYC verification to list and sell products.
+        </Alert>
+      )}
 
       <Grid container spacing={3}>
         {statCards.map((card, index) => (

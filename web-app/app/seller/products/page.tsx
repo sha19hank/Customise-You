@@ -22,6 +22,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import { useRouter } from 'next/navigation';
+import apiClient from '@/services/api';
 
 interface Product {
   id: string;
@@ -48,7 +49,6 @@ export default function SellerProducts() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('customiseyou_access_token');
       const userStr = localStorage.getItem('user');
       
       if (!userStr) {
@@ -59,21 +59,11 @@ export default function SellerProducts() {
       const user = JSON.parse(userStr);
       const sellerId = user.id;
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/seller/products?sellerId=${sellerId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await apiClient.get(`/seller/products?sellerId=${sellerId}`);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch products');
+      if (response.data.success) {
+        setProducts(response.data.data);
       }
-
-      const data = await response.json();
-      setProducts(data.data);
     } catch (err: any) {
       console.error('Error fetching products:', err);
       setError(err.message || 'Failed to load products');

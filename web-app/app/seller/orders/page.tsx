@@ -18,6 +18,7 @@ import {
   MenuItem,
   FormControl,
 } from '@mui/material';
+import apiClient from '@/services/api';
 
 interface Order {
   id: string;
@@ -42,7 +43,6 @@ export default function SellerOrders() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('customiseyou_access_token');
       const userStr = localStorage.getItem('user');
       
       if (!userStr) {
@@ -53,21 +53,11 @@ export default function SellerOrders() {
       const user = JSON.parse(userStr);
       const sellerId = user.id;
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/seller/orders?sellerId=${sellerId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await apiClient.get(`/seller/orders?sellerId=${sellerId}`);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch orders');
+      if (response.data.success) {
+        setOrders(response.data.data);
       }
-
-      const data = await response.json();
-      setOrders(data.data);
     } catch (err: any) {
       console.error('Error fetching orders:', err);
       setError(err.message || 'Failed to load orders');

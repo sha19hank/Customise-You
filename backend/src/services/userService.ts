@@ -39,7 +39,7 @@ class UserService {
       const result = await this.db.query(
         `SELECT id, email, phone, first_name, last_name, profile_image_url,
                 date_of_birth, gender, status, email_verified, phone_verified,
-                created_at, last_login_at
+                role, created_at, last_login_at
          FROM users WHERE id = $1`,
         [userId]
       );

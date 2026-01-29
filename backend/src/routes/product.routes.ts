@@ -147,6 +147,33 @@ router.post(
         throw new ValidationError('Missing required fields');
       }
 
+      // Check KYC status before allowing product creation
+      const kycData = await db.query(
+        'SELECT status FROM seller_kyc WHERE user_id = $1',
+        [seller_id]
+      );
+
+      if (kycData.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            message: 'KYC verification required. Please complete KYC to list products.',
+            code: 'KYC_NOT_SUBMITTED',
+          },
+        });
+      }
+
+      if (kycData.rows[0].status !== 'approved') {
+        return res.status(403).json({
+          success: false,
+          error: {
+            message: `KYC verification ${kycData.rows[0].status}. You cannot list products until KYC is approved.`,
+            code: 'KYC_NOT_APPROVED',
+            status: kycData.rows[0].status,
+          },
+        });
+      }
+
       const newProduct = await productService.createProduct({
         name,
         description,
